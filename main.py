@@ -4,6 +4,11 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import os
+import uvicorn
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Email Agent API")
 
@@ -21,7 +26,13 @@ SMTP_PASS = os.getenv("SMTP_PASS", "")
 
 @app.get("/")
 def root():
-    return {"status": "Email Agent API running"}
+    return {
+        "status": "Email Agent API running",
+        "smtp_host": SMTP_HOST,
+        "smtp_port": SMTP_PORT,
+        "smtp_user": SMTP_USER if SMTP_USER else "NO CONFIGURADO",
+        "smtp_pass_set": "SI" if SMTP_PASS else "NO CONFIGURADO"
+    }
 
 @app.post("/send-email")
 async def send_email(request: Request):
@@ -35,7 +46,10 @@ async def send_email(request: Request):
     body = data.get("body", "").strip()
 
     if not to or not subject or not body:
-        raise HTTPException(status_code=400, detail="Campos to, subject e body sao obrigatorios")
+        raise HTTPException(status_code=400, detail="Campos to, subject y body son obligatorios")
+
+    logger.info(f"Intentando enviar email a: {to}")
+    logger.info(f"SMTP: {SMTP_HOST}:{SMTP_PORT} con usuario: {SMTP_USER}")
 
     try:
         msg = MIMEMultipart("alternative")
@@ -44,16 +58,30 @@ async def send_email(request: Request):
         msg["Subject"] = subject
         msg.attach(MIMEText(body, "plain", "utf-8"))
 
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
+            server.set_debuglevel(1)
             server.ehlo()
             server.starttls()
+            server.ehlo()
             server.login(SMTP_USER, SMTP_PASS)
             server.sendmail(SMTP_USER, to, msg.as_string())
 
-        return {"success": True, "message": "Email enviado com sucesso!"}
-    except smtplib.SMTPAuthenticationError:
-        raise HTTPException(status_code=401, detail="Erro de autenticacao SMTP. Verifique usuario e senha.")
+        logger.info("Email enviado exitosamente")
+        return {"success": True, "message": "Email enviado con exito!"}
+
+    except smtplib.SMTPAuthenticationError as e:
+        logger.error(f"Error de autenticacion: {e}")
+        raise HTTPException(status_code=401, detail=f"Error de autenticacion SMTP: {str(e)}")
+    except smtplib.SMTPConnectError as e:
+        logger.error(f"Error de conexion SMTP: {e}")
+        raise HTTPException(status_code=500, detail=f"No se pudo conectar al servidor SMTP: {str(e)}")
     except smtplib.SMTPException as e:
-        raise HTTPException(status_code=500, detail=f"Erro SMTP: {str(e)}")
+        logger.error(f"Error SMTP: {e}")
+        raise HTTPException(status_code=500, detail=f"Error SMTP: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error inesperado: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {str(e)}")
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
