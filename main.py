@@ -19,8 +19,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-SMTP_HOST = os.getenv("SMTP_HOST", "mail.seudominio.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_HOST = os.getenv("SMTP_HOST", "mail.agraound.site")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "465"))
 SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASS = os.getenv("SMTP_PASS", "")
 
@@ -48,8 +48,7 @@ async def send_email(request: Request):
     if not to or not subject or not body:
         raise HTTPException(status_code=400, detail="Campos to, subject y body son obligatorios")
 
-    logger.info(f"Intentando enviar email a: {to}")
-    logger.info(f"SMTP: {SMTP_HOST}:{SMTP_PORT} con usuario: {SMTP_USER}")
+    logger.info(f"Enviando a: {to} via {SMTP_HOST}:{SMTP_PORT}")
 
     try:
         msg = MIMEMultipart("alternative")
@@ -58,11 +57,8 @@ async def send_email(request: Request):
         msg["Subject"] = subject
         msg.attach(MIMEText(body, "plain", "utf-8"))
 
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
-            server.set_debuglevel(1)
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
+        # Puerto 465 = SSL directo (no STARTTLS)
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=15) as server:
             server.login(SMTP_USER, SMTP_PASS)
             server.sendmail(SMTP_USER, to, msg.as_string())
 
@@ -70,16 +66,13 @@ async def send_email(request: Request):
         return {"success": True, "message": "Email enviado con exito!"}
 
     except smtplib.SMTPAuthenticationError as e:
-        logger.error(f"Error de autenticacion: {e}")
-        raise HTTPException(status_code=401, detail=f"Error de autenticacion SMTP: {str(e)}")
+        logger.error(f"Auth error: {e}")
+        raise HTTPException(status_code=401, detail=f"Error de autenticacion: {str(e)}")
     except smtplib.SMTPConnectError as e:
-        logger.error(f"Error de conexion SMTP: {e}")
-        raise HTTPException(status_code=500, detail=f"No se pudo conectar al servidor SMTP: {str(e)}")
-    except smtplib.SMTPException as e:
-        logger.error(f"Error SMTP: {e}")
-        raise HTTPException(status_code=500, detail=f"Error SMTP: {str(e)}")
+        logger.error(f"Connect error: {e}")
+        raise HTTPException(status_code=500, detail=f"No se pudo conectar al SMTP: {str(e)}")
     except Exception as e:
-        logger.error(f"Error inesperado: {type(e).__name__}: {e}")
+        logger.error(f"Error: {type(e).__name__}: {e}")
         raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {str(e)}")
 
 if __name__ == "__main__":
