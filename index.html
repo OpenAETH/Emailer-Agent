@@ -762,20 +762,27 @@ async function doLogin(){
   }finally{ btn.textContent='Ingresar'; btn.disabled=false; }
 }
 
-async function doLogout(){
-  try{ await apiFetch('/auth/logout',{method:'POST'}); }catch(e){}
+async function doLogout(skipApi=false){
+  if(!skipApi){ try{ await apiFetch('/auth/logout',{method:'POST'}); }catch(e){} }
   SESSION_TOKEN=''; localStorage.removeItem('session_token');
+  _appInitialized = false;
   document.getElementById('appShell').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
   document.getElementById('loginUser').value='';
   document.getElementById('loginPass').value='';
 }
 
+let _appInitialized = false;
 function showApp(){
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('appShell').style.display='flex';
-  loadDashboard(); loadContacts(); checkStatus();
-  setInterval(checkStatus,30000); setInterval(loadStats,60000);
+  if(!_appInitialized){
+    _appInitialized = true;
+    setInterval(checkStatus, 30000);
+    setInterval(loadStats, 60000);
+  }
+  // Cargar datos iniciales sin bloquear si alguno falla
+  Promise.allSettled([loadDashboard(), loadContacts(), checkStatus()]);
 }
 
 async function checkAuth(){
@@ -784,6 +791,8 @@ async function checkAuth(){
       headers:SESSION_TOKEN?{'X-Session-Token':SESSION_TOKEN}:{}});
     if(r.ok){ showApp(); return; }
   }catch(e){}
+  // Sesión inválida o expirada — limpiar sin loop
+  SESSION_TOKEN=''; localStorage.removeItem('session_token');
   document.getElementById('loginScreen').style.display='flex';
   document.getElementById('appShell').style.display='none';
 }
@@ -793,7 +802,7 @@ async function apiFetch(path, opts={}){
   const headers = {'Content-Type':'application/json', ...(opts.headers||{})};
   if(SESSION_TOKEN) headers['X-Session-Token'] = SESSION_TOKEN;
   const r = await fetch(API+path, {...opts, headers, credentials:'include'});
-  if(r.status===401){ doLogout(); throw new Error('Sesion expirada'); }
+  if(r.status===401){ doLogout(true); throw new Error('Sesion expirada'); }
   return r;
 }
 
@@ -834,8 +843,8 @@ function go(view){
 async function checkStatus(){
   const dot=document.getElementById('apiDot'), txt=document.getElementById('apiStatus');
   try{
-    const r=await apiFetch('/');
-    if(r.ok){const d=await r.json();dot.classList.add('on');txt.textContent='conectado';document.getElementById('configUser').textContent=d.smtp_user;}
+    const r=await apiFetch('/api/status');
+    if(r.ok){const d=await r.json();dot.classList.add('on');txt.textContent='conectado';document.getElementById('configUser').textContent=d.smtp_user||'';}
     else{dot.classList.remove('on');txt.textContent='error';}
   }catch(e){dot.classList.remove('on');txt.textContent='sin conexion';}
 }
@@ -930,12 +939,13 @@ function matchContact(){
 
 async function getEntityContext(){
   try{const ctx=await(await apiFetch('/context')).json();
-    if(ctx.entity||ctx.mission||ctx.extra)return `
-
-CONTEXTO DE LA ENTIDAD:
-${ctx.entity?'Entidad: '+ctx.entity+'
-':''}${ctx.mission?'Mision: '+ctx.mission+'
-':''}${ctx.extra?'Instrucciones: '+ctx.extra:''}`;
+    if(ctx.entity||ctx.mission||ctx.extra){
+      const lines=['\n\nCONTEXTO DE LA ENTIDAD:'];
+      if(ctx.entity)  lines.push('Entidad: '+ctx.entity);
+      if(ctx.mission) lines.push('Mision: '+ctx.mission);
+      if(ctx.extra)   lines.push('Instrucciones: '+ctx.extra);
+      return lines.join('\n');
+    }
   }catch(e){}
   return '';
 }
@@ -952,22 +962,14 @@ async function composeEmail(){
   if(!subject)return toast('Ingresa el asunto','error');
   if(!prompt)return toast('Describe el email','error');
   const c=contacts.find(x=>x.email.toLowerCase()===to.toLowerCase());
-  let contactInfo=c?`
-
-CONTACTO:
-Nombre: ${c.name}
-Empresa: ${c.company||'N/A'}
-Rol: ${c.role||'N/A'}
-Contexto: ${c.context||'N/A'}`:'';
-  const entityInfo=await getEntityContext();
+  const contactInfo=c ? '\n\nCONTACTO:\nNombre: '+c.name+'\nEmpresa: '+(c.company||'N/A')+'\nRol: '+(c.role||'N/A')+'\nContexto: '+(c.context||'N/A') : '';  const entityInfo=await getEntityContext();
   const btn=document.getElementById('btnCompose');btn.disabled=true;btn.innerHTML='<span class="spinner spinner-dk"></span> Generando...';
   const body=document.getElementById('composedBody');body.textContent='';body.classList.add('streaming');
   try{
-    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:'llama-3.3-70b-versatile',stream:true,messages:[{role:'system',content:`Eres asistente ejecutivo experto en comunicaciones profesionales en espanol. Escribe el cuerpo del email en Markdown (usa **negrita**, *italica*, listas, ##titulos). NO incluyas encabezados como Para/De/Asunto. Usa ${intentPrompts[currentIntent]||'tono profesional'}. Destinatario: ${to}. Asunto: ${subject}.${contactInfo}${entityInfo}`},{role:'user',content:prompt}]})});
+    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:'llama-3.3-70b-versatile',stream:true,messages:[{role:'system',content:`Eres asistente ejecutivo experto en comunicaciones profesionales en espanol. Escribe el cuerpo del email en Markdown (usa **negrita**, *italica*, listas, ##titulos). NO incluyas encabezados como Para, De, Asunto. Usa ${intentPrompts[currentIntent]||'tono profesional'}. Destinatario: ${to}. Asunto: ${subject}.${contactInfo}${entityInfo}`},{role:'user',content:prompt}]})});
     if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'Error Groq');}
     const reader=res.body.getReader(),decoder=new TextDecoder();let buffer='';
-    while(true){const{done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const lines=buffer.split('
-');buffer=lines.pop();for(const line of lines){const clean=line.replace(/^data: /,'').trim();if(!clean||clean==='[DONE]')continue;try{body.textContent+=JSON.parse(clean).choices?.[0]?.delta?.content||'';}catch{}}}
+    while(true){const{done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const lines=buffer.split('\n');buffer=lines.pop();for(const line of lines){const clean=line.replace(/^data: /,'').trim();if(!clean||clean==='[DONE]')continue;try{body.textContent+=JSON.parse(clean).choices?.[0]?.delta?.content||'';}catch{}}}
     body.classList.remove('streaming');
   }catch(e){toast('Error Groq: '+e.message,'error');body.classList.remove('streaming');}
   finally{btn.disabled=false;btn.innerHTML='<svg width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5.5" cy="5.5" r="4.5" stroke="#0c0f0a" stroke-width="1.2"/><path d="M5.5 3v5M3 5.5h5" stroke="#0c0f0a" stroke-width="1.2" stroke-linecap="round"/></svg> Generar con Groq';}
@@ -1137,8 +1139,7 @@ function toggleBulkContact(email,name,btn){
 function getBulkRecipients(){
   const all=new Set(bulkRecipients);
   const extra=document.getElementById('bulk-extra').value;
-  extra.split(/[
-,;]+/).map(e=>e.trim()).filter(e=>e.includes('@')).forEach(e=>all.add(e));
+  extra.split(/[\n,;]+/).map(e=>e.trim()).filter(e=>e.includes('@')).forEach(e=>all.add(e));
   return [...all];
 }
 
@@ -1166,11 +1167,10 @@ async function generateBulkEmail(){
   const btn=document.getElementById('btnBulkGenerate');btn.disabled=true;btn.innerHTML='<span class="spinner spinner-dk"></span> Generando...';
   const body=document.getElementById('bulkBody');body.textContent='';body.classList.add('streaming');
   try{
-    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:'llama-3.3-70b-versatile',stream:true,messages:[{role:'system',content:`Eres asistente ejecutivo experto en comunicaciones en espanol. Escribe el cuerpo del email en Markdown (**negrita**, *italica*, listas, ##titulos). NO incluyas encabezados Para/De/Asunto. Usa ${intentPrompts[bulkIntent]||'tono profesional'}. Asunto: ${subject}.${entityInfo}`},{role:'user',content:prompt}]})});
+    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:'llama-3.3-70b-versatile',stream:true,messages:[{role:'system',content:`Eres asistente ejecutivo experto en comunicaciones en espanol. Escribe el cuerpo del email en Markdown (**negrita**, *italica*, listas, ##titulos). NO incluyas encabezados Para, De, Asunto. Usa ${intentPrompts[bulkIntent]||'tono profesional'}. Asunto: ${subject}.${entityInfo}`},{role:'user',content:prompt}]})});
     if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'Error Groq');}
     const reader=res.body.getReader(),decoder=new TextDecoder();let buffer='';
-    while(true){const{done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const lines=buffer.split('
-');buffer=lines.pop();for(const line of lines){const clean=line.replace(/^data: /,'').trim();if(!clean||clean==='[DONE]')continue;try{body.textContent+=JSON.parse(clean).choices?.[0]?.delta?.content||'';}catch{}}}
+    while(true){const{done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const lines=buffer.split('\n');buffer=lines.pop();for(const line of lines){const clean=line.replace(/^data: /,'').trim();if(!clean||clean==='[DONE]')continue;try{body.textContent+=JSON.parse(clean).choices?.[0]?.delta?.content||'';}catch{}}}
     body.classList.remove('streaming');
   }catch(e){toast('Error Groq: '+e.message,'error');body.classList.remove('streaming');}
   finally{btn.disabled=false;btn.textContent='Generar con Groq';}
@@ -1213,13 +1213,13 @@ async function confirmBulkSend(){
       document.getElementById('bulkResults').style.display='block';
       document.getElementById('bulkResults').innerHTML=results.map(r=>`<div style="color:${r.ok?'var(--green)':'var(--red)'}">${r.ok?'&#x2713;':'&#x2717;'} ${r.to}${r.error?' — '+r.error:''}</div>`).join('');
     }
-    document.getElementById('bulkModalBtns').innerHTML='<button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeModal('modalBulk')">Cerrar</button>';
+    document.getElementById('bulkModalBtns').innerHTML='<button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeModal(&apos;modalBulk&apos;)">Cerrar</button>';
     document.getElementById('bulkModalBtns').style.display='flex';
     toast(`${ok.length} emails enviados${fail.length?' ('+fail.length+' fallidos)':''}`,fail.length?'':'success');
     loadStats();
   }catch(e){
     document.getElementById('bulkProgressText').textContent='Error: '+e.message;
-    document.getElementById('bulkModalBtns').innerHTML='<button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeModal('modalBulk')">Cerrar</button>';
+    document.getElementById('bulkModalBtns').innerHTML='<button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeModal(&apos;modalBulk&apos;)">Cerrar</button>';
     document.getElementById('bulkModalBtns').style.display='flex';
     toast('Error: '+e.message,'error');
   }
