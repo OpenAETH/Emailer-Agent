@@ -36,8 +36,15 @@ def cfg():
 
 APP_USER     = os.getenv("APP_USER", "admin")
 APP_PASSWORD = os.getenv("APP_PASSWORD", "admin")
-SECRET_KEY   = os.getenv("SECRET_KEY", secrets.token_hex(32))
+SECRET_KEY   = os.getenv("SECRET_KEY", "")
+if not SECRET_KEY:
+    SECRET_KEY = secrets.token_hex(32)
+    logger.warning("SECRET_KEY no configurada en entorno — usando valor aleatorio efímero. "
+                   "Las sesiones no sobrevivirán reinicios. Configura SECRET_KEY en Render.")
 TOKEN_TTL    = int(os.getenv("TOKEN_TTL_HOURS", "8")) * 3600
+
+# True cuando corre en Render (HTTPS) o cuando se fuerza con COOKIE_SECURE=true
+IS_HTTPS = os.getenv("RENDER", "") != "" or os.getenv("COOKIE_SECURE", "").lower() == "true"
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 DB   = os.path.join(BASE, "data.db")
@@ -419,9 +426,15 @@ async def login(request: Request):
     conn.execute("INSERT INTO sessions (token,created_at,expires_at) VALUES (?,?,?)",
                  (token, now, now + TOKEN_TTL))
     conn.commit(); conn.close()
+    logger.info(f"Login OK: user={user!r} | IS_HTTPS={IS_HTTPS}")
     resp = JSONResponse({"success": True, "token": token})
-    resp.set_cookie("session", token, httponly=True, samesite="lax",
-                    max_age=TOKEN_TTL, secure=False)
+    resp.set_cookie(
+        "session", token,
+        httponly=True,
+        samesite="lax",
+        max_age=TOKEN_TTL,
+        secure=IS_HTTPS,   # True en Render (HTTPS), False en local
+    )
     return resp
 
 @app.post("/auth/logout")
@@ -766,6 +779,12 @@ def get_stats(_: str = Depends(require_auth)):
 # ─────────────────────────────────────────────
 # SERVIR FRONTEND (sin autenticación)
 # ─────────────────────────────────────────────
+@app.head("/")
+async def head_frontend():
+    """Health-check de Render — responde 200 a HEAD /"""
+    from fastapi.responses import Response
+    return Response(status_code=200)
+
 @app.get("/")
 async def serve_frontend():
     """Sirve el frontend SPA sin autenticación"""
