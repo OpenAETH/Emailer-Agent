@@ -1,18 +1,18 @@
 """
 Asistente Ejecutivo — Deploy Render
 Auth: JWT session  |  IMAP sync (delete-aware)  |  Envio multiple
+Envio: Resend API (resend.com)
 """
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
-import sqlite3, os, smtplib, imaplib, email as email_lib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+import sqlite3, os, imaplib, email as email_lib
 from email.header import decode_header
 from datetime import datetime, timedelta
 import uvicorn, logging, re, secrets, hashlib, hmac, json, time
+import resend
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -22,16 +22,15 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────
 def cfg():
     return {
-        "smtp_method":  os.getenv("SMTP_METHOD", "smtp_ssl"),
-        "smtp_host":    os.getenv("SMTP_HOST", ""),
-        "smtp_port":    int(os.getenv("SMTP_PORT", "465")),
-        "smtp_user":    os.getenv("SMTP_USER", ""),
-        "smtp_pass":    os.getenv("SMTP_PASS", ""),
-        "sender_name":  os.getenv("SENDER_NAME", ""),
-        "imap_host":    os.getenv("IMAP_HOST", ""),
-        "imap_port":    int(os.getenv("IMAP_PORT", "993")),
-        "imap_user":    os.getenv("IMAP_USER", ""),
-        "imap_pass":    os.getenv("IMAP_PASS", ""),
+        # Resend
+        "resend_api_key": os.getenv("RESEND_API_KEY", ""),
+        "sender_email":   os.getenv("SENDER_EMAIL", os.getenv("SMTP_USER", "")),  # fallback a SMTP_USER por compatibilidad
+        "sender_name":    os.getenv("SENDER_NAME", ""),
+        # IMAP (sin cambios)
+        "imap_host":      os.getenv("IMAP_HOST", ""),
+        "imap_port":      int(os.getenv("IMAP_PORT", "993")),
+        "imap_user":      os.getenv("IMAP_USER", ""),
+        "imap_pass":      os.getenv("IMAP_PASS", ""),
     }
 
 APP_USER     = os.getenv("APP_USER", "admin")
@@ -226,30 +225,32 @@ def build_html_email(body_text: str, style_cfg: dict = None) -> str:
 </table></td></table></body></html>"""
 
 # ─────────────────────────────────────────────
-# SMTP SEND
+# RESEND SEND
 # ─────────────────────────────────────────────
-def send_smtp(to: str, subject: str, body_plain: str, body_html: str, reply_to_mid: str = None):
+def send_resend(to: str, subject: str, body_plain: str, body_html: str, reply_to_mid: str = None):
     c = cfg()
-    msg = MIMEMultipart("alternative")
-    sender = f"{c['sender_name']} <{c['smtp_user']}>" if c['sender_name'] else c['smtp_user']
-    msg["From"] = sender; msg["To"] = to; msg["Subject"] = subject
+    if not c["resend_api_key"]:
+        raise ValueError("RESEND_API_KEY no configurada en las variables de entorno de Render")
+    if not c["sender_email"]:
+        raise ValueError("SENDER_EMAIL no configurada en las variables de entorno de Render")
+
+    resend.api_key = c["resend_api_key"]
+
+    from_addr = f"{c['sender_name']} <{c['sender_email']}>" if c["sender_name"] else c["sender_email"]
+
+    params: resend.Emails.SendParams = {
+        "from":    from_addr,
+        "to":      [to],
+        "subject": subject,
+        "html":    body_html,
+        "text":    body_plain,
+    }
     if reply_to_mid:
-        msg["In-Reply-To"] = reply_to_mid; msg["References"] = reply_to_mid
-    msg.attach(MIMEText(body_plain, "plain", "utf-8"))
-    msg.attach(MIMEText(body_html,  "html",  "utf-8"))
-    m = c["smtp_method"]
-    if m in ("smtp_ssl", "gmail"):
-        host = "smtp.gmail.com" if m == "gmail" else c["smtp_host"]
-        with smtplib.SMTP_SSL(host, c["smtp_port"], timeout=20) as s:
-            s.login(c["smtp_user"], c["smtp_pass"]); s.sendmail(c["smtp_user"], to, msg.as_string())
-    elif m == "outlook":
-        with smtplib.SMTP("smtp.office365.com", 587, timeout=20) as s:
-            s.ehlo(); s.starttls(); s.ehlo()
-            s.login(c["smtp_user"], c["smtp_pass"]); s.sendmail(c["smtp_user"], to, msg.as_string())
-    else:
-        with smtplib.SMTP(c["smtp_host"], c["smtp_port"], timeout=20) as s:
-            s.ehlo(); s.starttls(); s.ehlo()
-            s.login(c["smtp_user"], c["smtp_pass"]); s.sendmail(c["smtp_user"], to, msg.as_string())
+        params["headers"] = {"In-Reply-To": reply_to_mid, "References": reply_to_mid}
+
+    response = resend.Emails.send(params)
+    logger.info(f"Resend OK → {to} | id={response.get('id','?')}")
+    return response
 
 # ─────────────────────────────────────────────
 # IMAP SYNC (delete-aware)
@@ -458,17 +459,26 @@ async def auth_check(token: str = Depends(require_auth)):
 @app.get("/api/status")
 def root(_: str = Depends(require_auth)):
     c = cfg()
-    return {"status": "Asistente Ejecutivo API", "smtp_user": c["smtp_user"] or "NO CONFIG", "imap_host": c["imap_host"] or "NO CONFIG"}
+    return {
+        "status":       "Asistente Ejecutivo API",
+        "smtp_user":    c["sender_email"] or "NO CONFIG",   # smtp_user por compatibilidad con el frontend
+        "imap_host":    c["imap_host"]    or "NO CONFIG",
+        "provider":     "resend",
+        "resend_ready": bool(c["resend_api_key"] and c["sender_email"]),
+    }
 
 @app.get("/config")
 def get_config(_: str = Depends(require_auth)):
     c = cfg()
     return {
-        "smtp_method": c["smtp_method"], "smtp_host": c["smtp_host"],
-        "smtp_port": c["smtp_port"],     "smtp_user": c["smtp_user"],
-        "sender_name": c["sender_name"], "smtp_pass_set": bool(c["smtp_pass"]),
-        "imap_host": c["imap_host"],     "imap_port": c["imap_port"],
-        "imap_user": c["imap_user"],     "imap_pass_set": bool(c["imap_pass"]),
+        "provider":          "resend",
+        "sender_email":      c["sender_email"],
+        "sender_name":       c["sender_name"],
+        "resend_key_set":    bool(c["resend_api_key"]),
+        "imap_host":         c["imap_host"],
+        "imap_port":         c["imap_port"],
+        "imap_user":         c["imap_user"],
+        "imap_pass_set":     bool(c["imap_pass"]),
     }
 
 # ─────────────────────────────────────────────
@@ -610,8 +620,10 @@ async def send_email(request: Request, _: str = Depends(require_auth)):
     if not body:       raise HTTPException(400, "body es obligatorio")
 
     c = cfg()
-    if not c["smtp_user"] or not c["smtp_pass"]:
-        raise HTTPException(500, "SMTP no configurado — verifica variables de entorno en Render")
+    if not c["resend_api_key"]:
+        raise HTTPException(500, "RESEND_API_KEY no configurada — agregala en las variables de entorno de Render")
+    if not c["sender_email"]:
+        raise HTTPException(500, "SENDER_EMAIL no configurada — agregala en las variables de entorno de Render")
 
     style_cfg = _build_style()
     body_html = build_html_email(body, style_cfg)
@@ -620,21 +632,15 @@ async def send_email(request: Request, _: str = Depends(require_auth)):
     conn = get_db()
     for to in recipients:
         try:
-            send_smtp(to, subject, body, body_html, reply_to)
+            send_resend(to, subject, body, body_html, reply_to)
             _log_sent(conn, to, subject, body, body_html, intent, campaign_id)
             results.append({"to": to, "ok": True})
-            logger.info(f"Email enviado a {to}")
-        except smtplib.SMTPAuthenticationError as e:
-            logger.error(f"Auth error -> {to}: {e}")
-            results.append({"to": to, "ok": False, "error": f"Error de autenticacion: {e}"})
-        except smtplib.SMTPException as e:
-            logger.error(f"SMTP error -> {to}: {e}")
-            results.append({"to": to, "ok": False, "error": f"Error SMTP: {e}"})
-        except OSError as e:
-            logger.error(f"Network error -> {to}: {e}")
-            results.append({"to": to, "ok": False, "error": f"Error de red: {e}"})
+            logger.info(f"Email enviado via Resend a {to}")
+        except resend.exceptions.ResendError as e:
+            logger.error(f"Resend API error → {to}: {e}")
+            results.append({"to": to, "ok": False, "error": f"Resend error: {e}"})
         except Exception as e:
-            logger.error(f"Error inesperado -> {to}: {type(e).__name__}: {e}")
+            logger.error(f"Error inesperado → {to}: {type(e).__name__}: {e}")
             results.append({"to": to, "ok": False, "error": f"{type(e).__name__}: {e}"})
     try:
         conn.commit()
@@ -651,20 +657,23 @@ async def send_email(request: Request, _: str = Depends(require_auth)):
 
 @app.get("/smtp-test")
 async def smtp_test(_: str = Depends(require_auth)):
+    """Verifica que la API key de Resend sea válida enviando un ping a la API."""
     c = cfg()
-    if not c["smtp_user"] or not c["smtp_pass"]:
-        raise HTTPException(500, "SMTP no configurado")
+    if not c["resend_api_key"]:
+        raise HTTPException(500, "RESEND_API_KEY no configurada")
+    if not c["sender_email"]:
+        raise HTTPException(500, "SENDER_EMAIL no configurada")
     try:
-        m = c["smtp_method"]
-        if m in ("smtp_ssl","gmail"):
-            host = "smtp.gmail.com" if m == "gmail" else c["smtp_host"]
-            with smtplib.SMTP_SSL(host, c["smtp_port"], timeout=10) as s:
-                s.login(c["smtp_user"], c["smtp_pass"])
-        else:
-            host = "smtp.office365.com" if m == "outlook" else c["smtp_host"]
-            with smtplib.SMTP(host, c["smtp_port"], timeout=10) as s:
-                s.ehlo(); s.starttls(); s.ehlo(); s.login(c["smtp_user"], c["smtp_pass"])
-        return {"ok": True, "method": m, "host": c["smtp_host"], "user": c["smtp_user"]}
+        resend.api_key = c["resend_api_key"]
+        # Validar la key listando dominios (no envía nada, solo autentica)
+        domains = resend.Domains.list()
+        return {
+            "ok": True,
+            "provider": "resend",
+            "sender": c["sender_email"],
+            "sender_name": c["sender_name"],
+            "domains": [d.get("name") for d in (domains.get("data") or [])],
+        }
     except Exception as e:
         raise HTTPException(500, f"{type(e).__name__}: {e}")
 
