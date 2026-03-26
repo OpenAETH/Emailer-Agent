@@ -4,7 +4,7 @@ Auth: JWT session  |  IMAP sync (delete-aware)  |  Envio multiple
 """
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import sqlite3, os, smtplib, imaplib, email as email_lib
@@ -355,7 +355,23 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
                    allow_credentials=True)
 
 # ─────────────────────────────────────────────
-# ROUTES — AUTH
+# SERVIR FRONTEND SIN AUTENTICACIÓN
+# ─────────────────────────────────────────────
+static_dir = os.path.join(BASE, "static")
+if not os.path.exists(static_dir):
+    os.makedirs(static_dir)
+
+# Montar archivos estáticos si existen
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+# Lista de rutas de API que NO deben ser servidas como frontend
+API_PATHS = ["auth", "contacts", "inbox", "send-email", "settings", "context", 
+             "preview-email", "logs", "memory", "supervision", "stats", 
+             "smtp-test", "config"]
+
+# ─────────────────────────────────────────────
+# ROUTES — AUTH (sin autenticación para login)
 # ─────────────────────────────────────────────
 @app.post("/auth/login")
 async def login(request: Request):
@@ -393,9 +409,9 @@ async def auth_check(token: str = Depends(require_auth)):
     return {"ok": True, "user": APP_USER}
 
 # ─────────────────────────────────────────────
-# ROUTES — CONFIG/STATUS
+# ROUTES — CONFIG/STATUS (protegidas)
 # ─────────────────────────────────────────────
-@app.get("/")
+@app.get("/api/status")
 def root(_: str = Depends(require_auth)):
     c = cfg()
     return {"status": "Asistente Ejecutivo API", "smtp_user": c["smtp_user"] or "NO CONFIG", "imap_host": c["imap_host"] or "NO CONFIG"}
@@ -717,13 +733,27 @@ def get_stats(_: str = Depends(require_auth)):
     return r
 
 # ─────────────────────────────────────────────
-# STATIC — servir index.html para todo lo demas
+# SERVIR FRONTEND (sin autenticación)
 # ─────────────────────────────────────────────
-from fastapi.responses import FileResponse
+@app.get("/")
+async def serve_frontend():
+    """Sirve el frontend SPA sin autenticación"""
+    index = os.path.join(BASE, "static", "index.html")
+    if os.path.exists(index):
+        return FileResponse(index)
+    return JSONResponse({"error": "Frontend no encontrado"}, status_code=404)
 
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
-    """Sirve el frontend SPA para cualquier ruta no-API."""
+    """Sirve el frontend SPA para cualquier ruta no-API"""
+    # Excluir rutas de API explícitamente
+    if full_path.startswith(tuple(API_PATHS)) or full_path in API_PATHS:
+        raise HTTPException(404, "Not found")
+    
+    # Excluir también rutas con extensión de archivo estático
+    if any(full_path.endswith(ext) for ext in ['.js', '.css', '.png', '.jpg', '.svg', '.ico', '.json']):
+        raise HTTPException(404, "Not found")
+    
     index = os.path.join(BASE, "static", "index.html")
     if os.path.exists(index):
         return FileResponse(index)
