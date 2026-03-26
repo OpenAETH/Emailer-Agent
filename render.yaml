@@ -2,7 +2,19 @@ services:
   - type: web
     name: asistente-ejecutivo
     env: python
-    buildCommand: pip install -r requirements.txt && mkdir -p static && cp index.html static/
+    buildCommand: |
+      pip install -r requirements.txt
+      mkdir -p static
+      # Copiar index.html si existe en la raíz
+      if [ -f index.html ]; then
+        cp index.html static/
+        echo "index.html copiado a static/"
+      else
+        echo "ADVERTENCIA: index.html no encontrado en la raíz"
+      fi
+      # Listar archivos para debug
+      ls -la
+      ls -la static/ || true
     startCommand: python api.py
     envVars:
       - key: SMTP_METHOD
