@@ -35,7 +35,7 @@ def cfg():
     }
 
 APP_USER     = os.getenv("APP_USER", "admin")
-APP_PASSWORD = os.getenv("APP_PASSWORD", "changeme")
+APP_PASSWORD = os.getenv("APP_PASSWORD", "admin")
 SECRET_KEY   = os.getenv("SECRET_KEY", secrets.token_hex(32))
 TOKEN_TTL    = int(os.getenv("TOKEN_TTL_HOURS", "8")) * 3600
 
