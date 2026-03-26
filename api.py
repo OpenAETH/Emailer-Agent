@@ -208,15 +208,15 @@ def build_html_email(body_text: str, style_cfg: dict = None) -> str:
     sname     = s.get("sender_name",    cfg()["sender_name"])
     sig_html  = s.get("signature_html", get_setting("signature_html",""))
     body_html = md_to_html(body_text).replace("LINKCOLOR", link_col)
-    sig_block = f'<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:28px;border-top:2px solid {primary};padding-top:18px"><tr><td style="font-size:13px;color:#555;font-family:{font}">{sig_html}</td></tr></table>' if sig_html else ""
+    sig_block = f'<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:28px;border-top:2px solid {primary};padding-top:18px">\<td style="font-size:13px;color:#555;font-family:{font}">{sig_html}</td>\</table>' if sig_html else ""
     return f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f4f4f4;font-family:{font}">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:24px 0"><tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:24px 0">\<td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:{bg};border-radius:10px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
-<tr><td style="background:{header_bg};padding:22px 32px"><span style="font-family:Georgia,serif;font-size:20px;font-weight:600;color:{header_fc};letter-spacing:-0.5px">{sname}</span></td></tr>
-<tr><td style="padding:32px 36px 24px;font-size:{fsize};color:{text_col};line-height:1.75;font-family:{font}">{body_html}{sig_block}</td></tr>
-<tr><td style="background:#f8f8f8;border-top:1px solid #e8e8e8;padding:14px 36px"><p style="margin:0;font-size:12px;color:#999;font-family:Arial,sans-serif">Enviado desde <strong>{sname}</strong>.</p></td></tr>
-</table></td></tr></table></body></html>"""
+\<td style="background:{header_bg};padding:22px 32px"><span style="font-family:Georgia,serif;font-size:20px;font-weight:600;color:{header_fc};letter-spacing:-0.5px">{sname}</span></td>
+\<td style="padding:32px 36px 24px;font-size:{fsize};color:{text_col};line-height:1.75;font-family:{font}">{body_html}{sig_block}</td>
+\<td style="background:#f8f8f8;border-top:1px solid #e8e8e8;padding:14px 36px"><p style="margin:0;font-size:12px;color:#999;font-family:Arial,sans-serif">Enviado desde <strong>{sname}</strong>.</p></td>
+</table></td></table></body></html>"""
 
 # ─────────────────────────────────────────────
 # SMTP SEND
@@ -355,20 +355,51 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
                    allow_credentials=True)
 
 # ─────────────────────────────────────────────
-# SERVIR FRONTEND SIN AUTENTICACIÓN
+# BUSCAR EL FRONTEND EN MÚLTIPLES UBICACIONES
 # ─────────────────────────────────────────────
+def find_index_html():
+    """Busca index.html en múltiples ubicaciones posibles"""
+    posibles_ubicaciones = [
+        os.path.join(BASE, "static", "index.html"),
+        os.path.join(BASE, "index.html"),
+        os.path.join(os.path.dirname(BASE), "static", "index.html"),
+        "/opt/render/project/src/static/index.html",  # Ruta típica en Render
+        "/app/static/index.html",  # Otra ruta común
+    ]
+    
+    for ubicacion in posibles_ubicaciones:
+        if os.path.exists(ubicacion):
+            logger.info(f"Frontend encontrado en: {ubicacion}")
+            return ubicacion
+    
+    logger.warning("No se encontró index.html en ninguna ubicación")
+    return None
+
+INDEX_PATH = find_index_html()
+
+# Crear directorio static si no existe
 static_dir = os.path.join(BASE, "static")
 if not os.path.exists(static_dir):
     os.makedirs(static_dir)
+    logger.info(f"Creado directorio static: {static_dir}")
 
-# Montar archivos estáticos si existen
-if os.path.exists(static_dir):
+# Si el archivo index.html está en la raíz, copiarlo a static/
+index_root = os.path.join(BASE, "index.html")
+if os.path.exists(index_root) and not os.path.exists(os.path.join(static_dir, "index.html")):
+    import shutil
+    shutil.copy2(index_root, os.path.join(static_dir, "index.html"))
+    logger.info(f"Copiado {index_root} a {static_dir}/")
+    INDEX_PATH = os.path.join(static_dir, "index.html")
+
+# Montar archivos estáticos si el directorio existe
+if os.path.exists(static_dir) and os.listdir(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
+    logger.info(f"Directorio static montado: {static_dir}")
 
 # Lista de rutas de API que NO deben ser servidas como frontend
 API_PATHS = ["auth", "contacts", "inbox", "send-email", "settings", "context", 
              "preview-email", "logs", "memory", "supervision", "stats", 
-             "smtp-test", "config"]
+             "smtp-test", "config", "api"]
 
 # ─────────────────────────────────────────────
 # ROUTES — AUTH (sin autenticación para login)
@@ -738,9 +769,15 @@ def get_stats(_: str = Depends(require_auth)):
 @app.get("/")
 async def serve_frontend():
     """Sirve el frontend SPA sin autenticación"""
-    index = os.path.join(BASE, "static", "index.html")
-    if os.path.exists(index):
-        return FileResponse(index)
+    if INDEX_PATH and os.path.exists(INDEX_PATH):
+        return FileResponse(INDEX_PATH)
+    
+    # Intentar servir desde la raíz como fallback
+    root_index = os.path.join(BASE, "index.html")
+    if os.path.exists(root_index):
+        return FileResponse(root_index)
+    
+    logger.error(f"No se pudo encontrar index.html. INDEX_PATH={INDEX_PATH}, BASE={BASE}")
     return JSONResponse({"error": "Frontend no encontrado"}, status_code=404)
 
 @app.get("/{full_path:path}")
@@ -754,9 +791,14 @@ async def serve_spa(full_path: str):
     if any(full_path.endswith(ext) for ext in ['.js', '.css', '.png', '.jpg', '.svg', '.ico', '.json']):
         raise HTTPException(404, "Not found")
     
-    index = os.path.join(BASE, "static", "index.html")
-    if os.path.exists(index):
-        return FileResponse(index)
+    if INDEX_PATH and os.path.exists(INDEX_PATH):
+        return FileResponse(INDEX_PATH)
+    
+    # Intentar servir desde la raíz como fallback
+    root_index = os.path.join(BASE, "index.html")
+    if os.path.exists(root_index):
+        return FileResponse(root_index)
+    
     return JSONResponse({"error": "Frontend no encontrado"}, status_code=404)
 
 if __name__ == "__main__":
