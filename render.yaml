@@ -1,16 +1,35 @@
 services:
   - type: web
-    name: email-agent-api
+    name: asistente-ejecutivo
     env: python
-    pythonVersion: "3.11"
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install -r requirements.txt && mkdir -p static && cp index.html static/
+    startCommand: python api.py
     envVars:
+      - key: SMTP_METHOD
+        value: smtp_ssl
       - key: SMTP_HOST
-        value: mail.seudominio.com
+        sync: false
       - key: SMTP_PORT
-        value: "587"
+        value: "465"
       - key: SMTP_USER
         sync: false
       - key: SMTP_PASS
         sync: false
+      - key: SENDER_NAME
+        sync: false
+      - key: IMAP_HOST
+        sync: false
+      - key: IMAP_PORT
+        value: "993"
+      - key: IMAP_USER
+        sync: false
+      - key: IMAP_PASS
+        sync: false
+      - key: APP_USER
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: TOKEN_TTL_HOURS
+        value: "8"

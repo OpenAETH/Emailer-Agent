@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Asistente Ejecutivo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0c0f0a;--bg2:#131710;--bg3:#1a1f18;--bg4:#212820;
+  --border:rgba(155,195,120,0.1);--border2:rgba(155,195,120,0.22);--border3:rgba(155,195,120,0.38);
+  --green:#7ec850;--green-dim:#3d6020;--green-glow:rgba(126,200,80,0.1);
+  --text:#deeacc;--text2:#7d9468;--text3:#435438;
+  --amber:#c8943a;--red:#c05050;--blue:#5090c8;
+  --mono:'DM Mono',monospace;--serif:'Playfair Display',serif;
+  --r:9px;--r2:14px;
+}
+html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;line-height:1.5}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse 50% 35% at 15% 5%,rgba(126,200,80,.05) 0%,transparent 70%),
+             radial-gradient(ellipse 35% 50% at 85% 95%,rgba(126,200,80,.03) 0%,transparent 60%)}
+
+.shell{display:flex;min-height:100vh;position:relative;z-index:1}
+.sidebar{width:200px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:1.25rem 0}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{padding:.8rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg2);gap:10px;flex-wrap:wrap}
+.content{flex:1;padding:1.5rem;overflow-y:auto}
+
+.brand{padding:.5rem 1.2rem 1.2rem;border-bottom:1px solid var(--border);margin-bottom:.75rem}
+.brand h1{font-family:var(--serif);font-size:15px;font-weight:600;color:var(--text);line-height:1.3}
+.brand p{font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-top:3px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:.6rem 1.2rem;font-size:11px;letter-spacing:.04em;color:var(--text3);cursor:pointer;transition:background .15s,color .15s;border-left:2px solid transparent;user-select:none}
+.nav-item svg{width:14px;height:14px;flex-shrink:0}
+.nav-item:hover{background:var(--bg3);color:var(--text2)}
+.nav-item.active{background:var(--bg3);color:var(--green);border-left-color:var(--green)}
+.nav-section{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);padding:.7rem 1.2rem .3rem;margin-top:.5rem}
+.status-indicator{margin-top:auto;padding:1rem 1.2rem;border-top:1px solid var(--border)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--text3);display:inline-block;margin-right:6px;transition:background .3s,box-shadow .3s}
+.dot.on{background:var(--green);box-shadow:0 0 5px var(--green)}
+
+.page-title{font-family:var(--serif);font-size:16px;font-weight:400;color:var(--text);white-space:nowrap}
+.topbar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.stat-pill{font-size:10px;color:var(--text3);padding:4px 9px;border:1px solid var(--border);border-radius:20px;white-space:nowrap}
+.stat-pill b{color:var(--text2)}
+
+.view{display:none}.view.active{display:block}
+.section-label{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;padding-left:2px}
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden;margin-bottom:1rem;transition:border-color .2s}
+.panel:focus-within{border-color:var(--border2)}
+.panel-header{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.panel-title{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);display:flex;align-items:center;gap:7px}
+.panel-title::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--green);box-shadow:0 0 4px var(--green)}
+.panel-footer{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-top:1px solid var(--border);background:var(--bg3);gap:8px}
+
+.field{display:flex;align-items:flex-start;padding:10px 14px;border-bottom:1px solid var(--border);gap:10px}
+.field:last-of-type{border-bottom:none}
+.field-key{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);width:72px;flex-shrink:0;padding-top:3px}
+.field input,.field textarea,.field select{flex:1;background:transparent;border:none;outline:none;font-family:var(--mono);font-size:13px;color:var(--text);caret-color:var(--green);resize:none;line-height:1.5}
+.field input::placeholder,.field textarea::placeholder{color:var(--text3);opacity:.5}
+.field select option{background:var(--bg2)}
+.grid2{display:grid;grid-template-columns:1fr 1fr}
+.cfg-field{padding:10px 14px;border-right:1px solid var(--border)}
+.cfg-field:last-child{border-right:none}
+.cfg-field.full{grid-column:1/-1;border-right:none;border-top:1px solid var(--border)}
+.cfg-field label{display:block;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:5px}
+.cfg-field input,.cfg-field select,.cfg-field textarea{width:100%;background:transparent;border:none;outline:none;font-family:var(--mono);font-size:12px;color:var(--text);caret-color:var(--green);resize:none}
+.cfg-field input::placeholder,.cfg-field textarea::placeholder{color:var(--text3)}
+.cfg-field select option{background:var(--bg2)}
+
+.btn{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;letter-spacing:.05em;border-radius:6px;padding:7px 13px;cursor:pointer;transition:opacity .15s,transform .1s;border:none;white-space:nowrap}
+.btn:active{transform:scale(.97)}.btn:disabled{opacity:.3;cursor:not-allowed;transform:none}
+.btn-green{background:var(--green);color:#0c0f0a;font-weight:500}.btn-green:hover{opacity:.88}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border)}.btn-ghost:hover{border-color:var(--border2);color:var(--text)}
+.btn-amber{background:transparent;color:var(--amber);border:1px solid rgba(200,148,58,.25)}.btn-amber:hover{border-color:var(--amber)}
+.btn-red{background:transparent;color:var(--red);border:1px solid rgba(192,80,80,.2)}.btn-red:hover{border-color:var(--red)}
+.btn-blue{background:transparent;color:var(--blue);border:1px solid rgba(80,144,200,.25)}.btn-blue:hover{border-color:var(--blue)}
+.btn-sm{padding:4px 9px;font-size:10px}
+
+.stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:1.5rem}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:14px}
+.stat-card .val{font-family:var(--serif);font-size:24px;font-weight:400;color:var(--text);margin-bottom:4px}
+.stat-card .lbl{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3)}
+
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:1rem}
+.contact-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:14px;cursor:pointer;transition:border-color .15s,background .15s}
+.contact-card:hover{border-color:var(--border2);background:var(--bg3)}
+.cc-name{font-family:var(--serif);font-size:15px;font-weight:400;color:var(--text);margin-bottom:3px}
+.cc-email{font-size:11px;color:var(--text3);margin-bottom:8px}
+.cc-meta{font-size:10px;color:var(--text2)}
+.cc-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.tag{font-size:9px;padding:2px 7px;border-radius:20px;border:1px solid var(--border2);color:var(--text3);letter-spacing:.06em}
+
+.inbox-item{padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s}
+.inbox-item:hover{background:var(--bg3)}
+.inbox-item.selected{background:var(--bg3);border-left:2px solid var(--green)}
+.ii-from{font-size:12px;color:var(--text);font-weight:500;margin-bottom:2px}
+.ii-subject{font-size:11px;color:var(--text2);margin-bottom:2px}
+.ii-date{font-size:10px;color:var(--text3)}
+.ii-badge{font-size:9px;padding:2px 6px;border-radius:10px;background:rgba(126,200,80,.12);color:var(--green);letter-spacing:.06em}
+
+.mem-item{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:flex-start}
+.mem-type{font-size:9px;padding:2px 7px;border-radius:10px;border:1px solid var(--border2);color:var(--text3);letter-spacing:.06em;white-space:nowrap;margin-top:2px;flex-shrink:0}
+.mem-content{font-size:12px;color:var(--text2);flex:1;line-height:1.5}
+.mem-date{font-size:10px;color:var(--text3);white-space:nowrap}
+
+.compose-wrap{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.generated-body{padding:14px;font-family:var(--serif);font-size:14px;font-style:italic;line-height:1.9;color:var(--text);white-space:pre-wrap;min-height:140px;outline:none}
+.generated-body.streaming{color:var(--text2)}
+.intent-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:12px 14px;border-bottom:1px solid var(--border)}
+.intent-btn{padding:7px 10px;border-radius:var(--r);border:1px solid var(--border);background:transparent;color:var(--text3);font-family:var(--mono);font-size:10px;letter-spacing:.05em;cursor:pointer;text-align:center;transition:all .15s}
+.intent-btn:hover{border-color:var(--border2);color:var(--text2)}
+.intent-btn.active{border-color:var(--green);color:var(--green);background:var(--green-glow)}
+
+/* SUPERVISION */
+.sup-row{display:grid;grid-template-columns:80px 130px 1fr 60px 60px 80px;gap:6px;padding:8px 14px;border-bottom:1px solid var(--border);align-items:center;font-size:11px}
+.sup-row:hover{background:var(--bg3)}
+.sup-header{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);background:var(--bg3)}
+.status-ok{color:var(--green)}.status-wait{color:var(--amber)}.status-no{color:var(--red)}
+.open-email-btn{font-size:9px;padding:2px 7px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text3);cursor:pointer;font-family:var(--mono);transition:border-color .15s,color .15s}
+.open-email-btn:hover{border-color:var(--green);color:var(--green)}
+
+/* CONTEXT TAB */
+.ctx-block{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:20px;margin-bottom:1rem}
+.ctx-title{font-family:var(--serif);font-size:15px;font-weight:400;color:var(--text);margin-bottom:6px}
+.ctx-hint{font-size:10px;color:var(--text3);margin-bottom:14px;line-height:1.6}
+.ctx-label{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:6px;display:block}
+.ctx-input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;font-family:var(--mono);font-size:12px;color:var(--text);outline:none;resize:none;line-height:1.6;caret-color:var(--green)}
+.ctx-input:focus{border-color:var(--border2)}
+
+/* STYLE PREVIEW */
+.preview-frame{width:100%;height:400px;border:1px solid var(--border);border-radius:var(--r2);background:#fff}
+
+/* MODAL */
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(5,8,4,.8);z-index:50;align-items:center;justify-content:center}
+.modal-backdrop.visible{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r2);padding:24px;max-width:680px;width:calc(100% - 2rem);margin:1rem;max-height:90vh;overflow-y:auto}
+.modal h2{font-family:var(--serif);font-size:18px;font-weight:400;margin-bottom:14px}
+.modal .info{font-size:12px;color:var(--text2);margin-bottom:5px}
+.modal .warn{margin-top:12px;padding:10px 12px;background:rgba(126,200,80,.05);border:1px solid rgba(126,200,80,.1);border-radius:var(--r);font-size:11px;color:var(--text3);line-height:1.6}
+.modal-btns{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.email-preview-html{width:100%;border:1px solid var(--border);border-radius:var(--r);background:#fff;min-height:300px;padding:0;overflow:hidden}
+
+.toast{position:fixed;bottom:24px;right:24px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:10px 16px;font-size:12px;color:var(--text);z-index:200;transform:translateY(60px);opacity:0;transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .3s;pointer-events:none;max-width:320px}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{border-color:var(--green-dim);color:var(--green)}
+.toast.error{border-color:rgba(192,80,80,.3);color:var(--red)}
+
+.spinner{display:inline-block;width:11px;height:11px;border:1.5px solid rgba(255,255,255,.2);border-top-color:currentColor;border-radius:50%;animation:spin .6s linear infinite}
+.spinner-dk{border-color:rgba(12,15,10,.2);border-top-color:#0c0f0a}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<!-- ═══ LOGIN SCREEN ═══ -->
+<div id="loginScreen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:999;display:flex;align-items:center;justify-content:center">
+  <div style="width:100%;max-width:360px;padding:1.5rem">
+    <div style="text-align:center;margin-bottom:2rem">
+      <div style="font-family:var(--serif);font-size:24px;font-weight:600;color:var(--text);margin-bottom:6px">Asistente Ejecutivo</div>
+      <div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3)">Comunicaciones</div>
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border)">
+        <div style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:6px">Usuario</div>
+        <input type="text" id="loginUser" placeholder="usuario" autocomplete="username"
+          style="width:100%;background:transparent;border:none;outline:none;font-family:var(--mono);font-size:14px;color:var(--text);caret-color:var(--green)"
+          onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus()"/>
+      </div>
+      <div style="padding:12px 16px">
+        <div style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:6px">Contrasena</div>
+        <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password"
+          style="width:100%;background:transparent;border:none;outline:none;font-family:var(--mono);font-size:14px;color:var(--text);caret-color:var(--green)"
+          onkeydown="if(event.key==='Enter')doLogin()"/>
+      </div>
+    </div>
+    <div id="loginError" style="display:none;margin-top:10px;font-size:11px;color:var(--red);text-align:center"></div>
+    <button onclick="doLogin()" id="btnLogin"
+      style="width:100%;margin-top:14px;background:var(--green);color:#0c0f0a;font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.06em;border:none;border-radius:8px;padding:12px;cursor:pointer;transition:opacity .15s">
+      Ingresar
+    </button>
+    <div style="text-align:center;margin-top:14px;font-size:10px;color:var(--text3)">
+      <span style="display:inline-flex;align-items:center;gap:6px"><span class="dot on"></span>Conexion segura</span>
+    </div>
+  </div>
+</div>
+
+<div class="shell" id="appShell" style="display:none">
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="brand" style="display:flex;align-items:flex-start;justify-content:space-between">
+    <div>
+      <h1>Asistente<br>Ejecutivo</h1>
+      <p>Comunicaciones</p>
+    </div>
+    <button onclick="doLogout()" title="Cerrar sesion"
+      style="background:transparent;border:none;cursor:pointer;color:var(--text3);padding:2px;line-height:1;font-size:16px;transition:color .15s"
+      onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text3)'">&#x2715;</button>
+  </div>
+  <span class="nav-section">Principal</span>
+  <div class="nav-item active" onclick="go('dashboard')">
+    <svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="5" height="5" rx="1.5" stroke="currentColor" stroke-width="1.2"/><rect x="9" y="2" width="5" height="5" rx="1.5" stroke="currentColor" stroke-width="1.2"/><rect x="2" y="9" width="5" height="5" rx="1.5" stroke="currentColor" stroke-width="1.2"/><rect x="9" y="9" width="5" height="5" rx="1.5" stroke="currentColor" stroke-width="1.2"/></svg>
+    Dashboard
+  </div>
+  <div class="nav-item" onclick="go('agenda')">
+    <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="3" stroke="currentColor" stroke-width="1.2"/><path d="M2 14c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+    Agenda
+  </div>
+  <div class="nav-item" onclick="go('compose')">
+    <svg viewBox="0 0 16 16" fill="none"><path d="M2 12L4 10l7-7 2 2-7 7-2 2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M9 3l2 2" stroke="currentColor" stroke-width="1.2"/></svg>
+    Redactar
+  </div>
+  <div class="nav-item" onclick="go('inbox')">
+    <svg viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M2 6l6 4 6-4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+    Bandeja
+  </div>
+  <span class="nav-section">Gestion</span>
+  <div class="nav-item" onclick="go('supervision')">
+    <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.2"/><path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+    Supervision
+  </div>
+  <div class="nav-item" onclick="go('memory')">
+    <svg viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h8M2 12h10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+    Memoria
+  </div>
+  <span class="nav-section">Config</span>
+  <div class="nav-item" onclick="go('context')">
+    <svg viewBox="0 0 16 16" fill="none"><path d="M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2z" stroke="currentColor" stroke-width="1.2"/><path d="M8 7v5M8 5v1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    Contexto
+  </div>
+  <div class="nav-item" onclick="go('estilo')">
+    <svg viewBox="0 0 16 16" fill="none"><path d="M3 13l4-10 4 10M5 9h6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Estilo y Firma
+  </div>
+  <div class="nav-item" onclick="go('bulk')">
+    <svg viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="13" cy="12" r="2.5" stroke="currentColor" stroke-width="1.2"/></svg>
+    Envio Multiple
+  </div>
+  <div class="nav-item" onclick="go('settings')">
+    <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.2 3.2l1.4 1.4M11.4 11.4l1.4 1.4M3.2 12.8l1.4-1.4M11.4 4.6l1.4-1.4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+    SMTP / IMAP
+  </div>
+  <div class="status-indicator">
+    <div style="font-size:10px;color:var(--text3);margin-bottom:6px;letter-spacing:.06em">CONEXION</div>
+    <div style="font-size:11px;color:var(--text2)"><span class="dot" id="apiDot"></span><span id="apiStatus">verificando...</span></div>
+    <div style="font-size:10px;color:var(--text3);margin-top:6px;word-break:break-all" id="configUser"></div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div class="main">
+<div class="topbar">
+  <span class="page-title" id="pageTitle">Dashboard</span>
+  <div class="topbar-right">
+    <div class="stat-pill"><b id="tContacts">-</b> contactos</div>
+    <div class="stat-pill"><b id="tSent">-</b> enviados</div>
+    <div class="stat-pill"><b id="tInbox">-</b> recibidos</div>
+    <input type="password" id="groqKey" placeholder="gsk_... Groq API Key"
+      style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-family:var(--mono);font-size:11px;color:var(--text);outline:none;width:190px"/>
+  </div>
+</div>
+<div class="content">
+
+<!-- ═══ DASHBOARD ═══ -->
+<div class="view active" id="view-dashboard">
+  <div class="stats-grid">
+    <div class="stat-card"><div class="val" id="s-contacts">-</div><div class="lbl">Contactos</div></div>
+    <div class="stat-card"><div class="val" id="s-sent">-</div><div class="lbl">Enviados</div></div>
+    <div class="stat-card"><div class="val" id="s-inbox">-</div><div class="lbl">Recibidos</div></div>
+    <div class="stat-card"><div class="val" id="s-replied">-</div><div class="lbl">Respondidos</div></div>
+    <div class="stat-card"><div class="val" id="s-memory">-</div><div class="lbl">Memorias</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div>
+      <div class="section-label">Acciones rapidas</div>
+      <div class="panel">
+        <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
+          <button class="btn btn-green" onclick="go('compose')" style="justify-content:center">Redactar nuevo email</button>
+          <button class="btn btn-ghost" onclick="go('inbox');refreshInbox()" style="justify-content:center">Revisar bandeja</button>
+          <button class="btn btn-ghost" onclick="go('supervision')" style="justify-content:center">Ver supervision</button>
+        </div>
+      </div>
+      <div class="section-label">Contexto activo</div>
+      <div class="panel" style="padding:14px" id="dashContext">
+        <div style="color:var(--text3);font-size:11px">Cargando...</div>
+      </div>
+    </div>
+    <div>
+      <div class="section-label">Memoria reciente</div>
+      <div class="panel" id="dashMemory" style="max-height:300px;overflow-y:auto">
+        <div style="padding:14px;color:var(--text3);font-size:11px">Cargando...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ AGENDA ═══ -->
+<div class="view" id="view-agenda">
+  <div style="display:flex;gap:10px;margin-bottom:1rem;align-items:center">
+    <input id="searchContact" type="text" placeholder="Buscar por nombre, email, empresa o tag..."
+      style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text);outline:none"
+      oninput="filterContacts()"/>
+    <button class="btn btn-green" onclick="openNewContact()">+ Nuevo</button>
+  </div>
+  <div class="card-grid" id="contactGrid"></div>
+  <div id="contactForm" style="display:none">
+    <div class="section-label" id="contactFormTitle">Nuevo contacto</div>
+    <div class="panel">
+      <div class="field"><span class="field-key">Nombre</span><input type="text" id="cf-name" placeholder="Nombre completo"/></div>
+      <div class="field"><span class="field-key">Email</span><input type="email" id="cf-email" placeholder="email@empresa.com"/></div>
+      <div class="field"><span class="field-key">Empresa</span><input type="text" id="cf-company" placeholder="Empresa u organizacion"/></div>
+      <div class="field"><span class="field-key">Rol</span><input type="text" id="cf-role" placeholder="Cargo o rol"/></div>
+      <div class="field"><span class="field-key">Telefono</span><input type="text" id="cf-phone" placeholder="+54 9 11..."/></div>
+      <div class="field"><span class="field-key">Contexto</span><textarea id="cf-context" rows="3" placeholder="Historial, intereses, notas relevantes..."></textarea></div>
+      <div class="field"><span class="field-key">Tags</span><input type="text" id="cf-tags" placeholder="cliente, inversor, proveedor..."/></div>
+      <div class="panel-footer">
+        <button class="btn btn-ghost btn-sm" onclick="cancelContact()">Cancelar</button>
+        <button class="btn btn-green btn-sm" onclick="saveContact()" id="btnSaveContact">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ COMPOSE ═══ -->
+<div class="view" id="view-compose">
+  <div class="compose-wrap">
+    <div>
+      <div class="section-label">Configurar email</div>
+      <div class="panel">
+        <div class="field">
+          <span class="field-key">Para</span>
+          <input type="email" id="c-to" placeholder="destinatario@empresa.com" oninput="matchContact()"/>
+        </div>
+        <div id="contactHint" style="padding:5px 14px 0;font-size:10px;color:var(--text3);display:none"></div>
+        <div class="field"><span class="field-key">Asunto</span><input type="text" id="c-subject" placeholder="Asunto del email..."/></div>
+        <div style="padding:10px 14px 6px;border-bottom:1px solid var(--border)">
+          <div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:8px">Intencion</div>
+          <div class="intent-grid">
+            <div class="intent-btn active" onclick="setIntent('profesional')">Profesional</div>
+            <div class="intent-btn" onclick="setIntent('seguimiento')">Seguimiento</div>
+            <div class="intent-btn" onclick="setIntent('reunion')">Reunion</div>
+            <div class="intent-btn" onclick="setIntent('crowdfunding')">Crowdfunding</div>
+            <div class="intent-btn" onclick="setIntent('propuesta')">Propuesta</div>
+            <div class="intent-btn" onclick="setIntent('informal')">Informal</div>
+          </div>
+        </div>
+        <div class="field" style="border-bottom:none">
+          <span class="field-key">Instruccion</span>
+          <textarea id="c-prompt" rows="5" placeholder="Describe el email. El agente incorporara contexto del contacto, de la entidad y la mision actual."></textarea>
+        </div>
+        <div class="panel-footer">
+          <span style="font-size:10px;color:var(--text3)"><span id="promptCount">0</span> chars</span>
+          <button class="btn btn-green" id="btnCompose" onclick="composeEmail()">
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5.5" cy="5.5" r="4.5" stroke="#0c0f0a" stroke-width="1.2"/><path d="M5.5 3v5M3 5.5h5" stroke="#0c0f0a" stroke-width="1.2" stroke-linecap="round"/></svg>
+            Generar con Groq
+          </button>
+        </div>
+      </div>
+      <div id="contactContextBox" style="display:none">
+        <div class="section-label">Contexto del contacto</div>
+        <div class="panel" style="padding:12px 14px"><div id="contactContextContent" style="font-size:12px;color:var(--text2);line-height:1.7"></div></div>
+      </div>
+    </div>
+    <div>
+      <div class="section-label">Email generado <span style="color:var(--text3);font-size:9px">(editable)</span></div>
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Borrador — formato Markdown</span>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-ghost btn-sm" onclick="previewEmail()">Vista HTML</button>
+            <button class="btn btn-ghost btn-sm" onclick="composeEmail()">Regenerar</button>
+          </div>
+        </div>
+        <div class="generated-body" id="composedBody" contenteditable="true" spellcheck="true">
+          <span style="color:var(--text3);font-style:normal;font-family:var(--mono);font-size:11px">El email generado aparecera aqui en Markdown. Puedes editarlo libremente.</span>
+        </div>
+        <div class="panel-footer">
+          <button class="btn btn-ghost btn-sm" onclick="clearCompose()">Limpiar</button>
+          <button class="btn btn-green btn-sm" onclick="openSendConfirm()">Revisar y enviar -&gt;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ INBOX ═══ -->
+<div class="view" id="view-inbox">
+  <div style="display:flex;gap:10px;margin-bottom:1rem;align-items:center">
+    <span style="font-size:11px;color:var(--text3)" id="inboxCount">- mensajes</span>
+    <button class="btn btn-ghost btn-sm" id="btnRefresh" onclick="refreshInbox()">Actualizar IMAP</button>
+  </div>
+  <div style="display:grid;grid-template-columns:290px 1fr;gap:12px;align-items:start">
+    <div class="panel" style="overflow:hidden">
+      <div id="inboxList" style="max-height:580px;overflow-y:auto">
+        <div style="padding:14px;color:var(--text3);font-size:11px">Presiona "Actualizar IMAP" para cargar.</div>
+      </div>
+    </div>
+    <div class="panel" id="inboxDetail" style="padding:20px">
+      <div style="color:var(--text3);font-size:11px;text-align:center;padding:2rem 0">Selecciona un mensaje</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SUPERVISION ═══ -->
+<div class="view" id="view-supervision">
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Seguimiento de envios</span>
+      <button class="btn btn-ghost btn-sm" onclick="loadSupervision()">Actualizar</button>
+    </div>
+    <div class="sup-row sup-header">
+      <span>Fecha</span><span>Destinatario</span><span>Asunto</span><span>Horas</span><span>Respuesta</span><span>Email</span>
+    </div>
+    <div id="supervisionList">
+      <div style="padding:14px;color:var(--text3);font-size:11px">Cargando...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MEMORY ═══ -->
+<div class="view" id="view-memory">
+  <div style="display:flex;gap:10px;margin-bottom:1rem">
+    <button class="btn btn-ghost btn-sm" onclick="loadMemory()">Actualizar</button>
+    <button class="btn btn-green btn-sm" onclick="openAddMemory()">+ Agregar nota</button>
+  </div>
+  <div class="panel" id="memoryList">
+    <div style="padding:14px;color:var(--text3);font-size:11px">Cargando...</div>
+  </div>
+</div>
+
+<!-- ═══ CONTEXTO ═══ -->
+<div class="view" id="view-context">
+  <div class="ctx-block">
+    <div class="ctx-title">Identidad y Mision</div>
+    <div class="ctx-hint">El agente incorporara este contexto automaticamente al redactar y responder emails. Define quien es la entidad y cual es su mision o campana activa.</div>
+    <label class="ctx-label">Entidad — quienes somos</label>
+    <textarea class="ctx-input" id="ctx-entity" rows="4" placeholder="Ej: Agraound es una editorial de desarrollo integrada por AETHERYON Systems como desarrolladora de software y OpenAETH como comunidad colaborativa..."></textarea>
+  </div>
+  <div class="ctx-block">
+    <label class="ctx-label">Mision actual — campana o foco</label>
+    <textarea class="ctx-input" id="ctx-mission" rows="3" placeholder="Ej: Comunicar la campana de crowdfunding y promocionar los tiers de financiamiento del proyecto..."></textarea>
+  </div>
+  <div class="ctx-block">
+    <label class="ctx-label">Contexto adicional — instrucciones para el agente</label>
+    <textarea class="ctx-input" id="ctx-extra" rows="3" placeholder="Ej: Siempre mencionar el link de la campana. Tono entusiasta pero profesional. No prometer fechas de entrega..."></textarea>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:.5rem">
+    <button class="btn btn-green" onclick="saveContext()">Guardar contexto</button>
+    <button class="btn btn-ghost" onclick="loadContext()">Descartar cambios</button>
+  </div>
+</div>
+
+<!-- ═══ ESTILO Y FIRMA ═══ -->
+<div class="view" id="view-estilo">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    <div>
+      <div class="section-label">Estilos del email</div>
+      <div class="panel">
+        <div class="grid2">
+          <div class="cfg-field" style="border-top:none">
+            <label>Fuente principal</label>
+            <select id="st-font">
+              <option value="Georgia, 'Times New Roman', serif">Georgia (serif)</option>
+              <option value="'Helvetica Neue', Arial, sans-serif">Helvetica (sans)</option>
+              <option value="'Gill Sans', Optima, sans-serif">Gill Sans</option>
+              <option value="Garamond, 'Book Antiqua', serif">Garamond</option>
+              <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+            </select>
+          </div>
+          <div class="cfg-field" style="border-top:none">
+            <label>Tamano de texto</label>
+            <select id="st-size">
+              <option value="14px">14px — compacto</option>
+              <option value="16px" selected>16px — estandar</option>
+              <option value="18px">18px — grande</option>
+            </select>
+          </div>
+          <div class="cfg-field">
+            <label>Color principal</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="color" id="st-primary" value="#7ec850" style="width:28px;height:24px;border:none;background:none;cursor:pointer;padding:0"/>
+              <input type="text" id="st-primary-hex" placeholder="#7ec850" style="flex:1"/>
+            </div>
+          </div>
+          <div class="cfg-field">
+            <label>Color de links</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="color" id="st-link" value="#2563eb" style="width:28px;height:24px;border:none;background:none;cursor:pointer;padding:0"/>
+              <input type="text" id="st-link-hex" placeholder="#2563eb" style="flex:1"/>
+            </div>
+          </div>
+          <div class="cfg-field">
+            <label>Fondo del email</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="color" id="st-bg" value="#ffffff" style="width:28px;height:24px;border:none;background:none;cursor:pointer;padding:0"/>
+              <input type="text" id="st-bg-hex" placeholder="#ffffff" style="flex:1"/>
+            </div>
+          </div>
+          <div class="cfg-field">
+            <label>Color del texto</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="color" id="st-text" value="#1a1a1a" style="width:28px;height:24px;border:none;background:none;cursor:pointer;padding:0"/>
+              <input type="text" id="st-text-hex" placeholder="#1a1a1a" style="flex:1"/>
+            </div>
+          </div>
+          <div class="cfg-field">
+            <label>Fondo del header</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="color" id="st-header-bg" value="#0c0f0a" style="width:28px;height:24px;border:none;background:none;cursor:pointer;padding:0"/>
+              <input type="text" id="st-header-bg-hex" placeholder="#0c0f0a" style="flex:1"/>
+            </div>
+          </div>
+          <div class="cfg-field">
+            <label>Color texto header</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="color" id="st-header-fc" value="#7ec850" style="width:28px;height:24px;border:none;background:none;cursor:pointer;padding:0"/>
+              <input type="text" id="st-header-fc-hex" placeholder="#7ec850" style="flex:1"/>
+            </div>
+          </div>
+          <div class="cfg-field full">
+            <label>Firma HTML</label>
+            <textarea id="st-sig" rows="4" placeholder="<strong>Nombre</strong><br>Cargo | Empresa<br><a href='https://...'>web</a>"></textarea>
+          </div>
+        </div>
+        <div class="panel-footer">
+          <button class="btn btn-ghost btn-sm" onclick="previewStyle()">Vista previa</button>
+          <button class="btn btn-green btn-sm" onclick="saveStyle()">Guardar estilos</button>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="section-label">Vista previa del email</div>
+      <iframe id="stylePreview" class="preview-frame" srcdoc="<html><body style='display:flex;align-items:center;justify-content:center;height:100%;color:#aaa;font-family:sans-serif;font-size:13px'>Presiona Vista previa</body></html>"></iframe>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SETTINGS ═══ -->
+<div class="view" id="view-settings">
+  <div class="section-label">SMTP — Envio</div>
+  <div class="panel" style="margin-bottom:1rem">
+    <div class="grid2">
+      <div class="cfg-field" style="grid-column:1/-1;border-right:none;border-top:none">
+        <label>Metodo</label>
+        <select id="s-smtp-method">
+          <option value="smtp_ssl">SSL directo — puerto 465</option>
+          <option value="smtp_tls">STARTTLS — puerto 587</option>
+          <option value="gmail">Gmail App Password</option>
+          <option value="outlook">Outlook / Office 365</option>
+        </select>
+      </div>
+      <div class="cfg-field" style="border-top:none"><label>SMTP Host</label><input type="text" id="s-smtp-host" placeholder="mail.dominio.com"/></div>
+      <div class="cfg-field" style="border-top:none"><label>Puerto</label><input type="number" id="s-smtp-port" placeholder="465"/></div>
+      <div class="cfg-field"><label>Email / Usuario</label><input type="email" id="s-smtp-user" placeholder="contacto@dominio.com"/></div>
+      <div class="cfg-field"><label>Contrasena</label><input type="password" id="s-smtp-pass" placeholder="Dejar vacio para no cambiar"/></div>
+      <div class="cfg-field full"><label>Nombre del remitente</label><input type="text" id="s-sender-name" placeholder="Mi Empresa"/></div>
+    </div>
+  </div>
+  <div class="section-label">IMAP — Lectura de bandeja</div>
+  <div class="panel" style="margin-bottom:1.5rem">
+    <div class="grid2">
+      <div class="cfg-field" style="border-top:none"><label>IMAP Host</label><input type="text" id="s-imap-host" placeholder="mail.dominio.com"/></div>
+      <div class="cfg-field" style="border-top:none"><label>Puerto</label><input type="number" id="s-imap-port" placeholder="993"/></div>
+      <div class="cfg-field"><label>Usuario</label><input type="email" id="s-imap-user" placeholder="contacto@dominio.com"/></div>
+      <div class="cfg-field"><label>Contrasena</label><input type="password" id="s-imap-pass" placeholder="Dejar vacio para no cambiar"/></div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-green" onclick="saveSettings()" id="btnSaveSettings">Guardar configuracion</button>
+    <button class="btn btn-ghost" onclick="testAPI()">Probar conexion</button>
+  </div>
+  <div id="settingsResult" style="display:none;margin-top:12px;padding:12px 14px;border-radius:var(--r);font-size:12px;border:1px solid;line-height:1.6"></div>
+</div>
+
+
+<!-- ═══ ENVIO MULTIPLE ═══ -->
+<div class="view" id="view-bulk">
+  <div class="compose-wrap">
+    <div>
+      <div class="section-label">Destinatarios</div>
+      <div class="panel">
+        <div style="padding:10px 14px;border-bottom:1px solid var(--border)">
+          <div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:8px">Agregar desde agenda</div>
+          <div id="bulkContactList" style="max-height:160px;overflow-y:auto;display:flex;flex-wrap:wrap;gap:6px"></div>
+        </div>
+        <div class="field" style="border-bottom:none">
+          <span class="field-key">Otros</span>
+          <textarea id="bulk-extra" rows="3" placeholder="emails adicionales, uno por linea o separados por coma"></textarea>
+        </div>
+      </div>
+      <div id="bulkSelected" style="margin-bottom:1rem;display:flex;flex-wrap:wrap;gap:6px"></div>
+      <div class="section-label">Email</div>
+      <div class="panel">
+        <div class="field"><span class="field-key">Asunto</span><input type="text" id="bulk-subject" placeholder="Asunto del email..."/></div>
+        <div style="padding:10px 14px 6px;border-bottom:1px solid var(--border)">
+          <div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:8px">Intencion</div>
+          <div class="intent-grid">
+            <div class="intent-btn active" onclick="setBulkIntent('profesional')">Profesional</div>
+            <div class="intent-btn" onclick="setBulkIntent('crowdfunding')">Crowdfunding</div>
+            <div class="intent-btn" onclick="setBulkIntent('seguimiento')">Seguimiento</div>
+            <div class="intent-btn" onclick="setBulkIntent('propuesta')">Propuesta</div>
+            <div class="intent-btn" onclick="setBulkIntent('reunion')">Reunion</div>
+            <div class="intent-btn" onclick="setBulkIntent('informal')">Informal</div>
+          </div>
+        </div>
+        <div class="field" style="border-bottom:none">
+          <span class="field-key">Instruccion</span>
+          <textarea id="bulk-prompt" rows="4" placeholder="Describe el email. El agente usara el contexto de la entidad y mision actual." oninput="document.getElementById('bulkPromptCount').textContent=this.value.length"></textarea>
+        </div>
+        <div class="panel-footer">
+          <span style="font-size:10px;color:var(--text3)"><span id="bulkPromptCount">0</span> chars</span>
+          <button class="btn btn-green" id="btnBulkGenerate" onclick="generateBulkEmail()">Generar con Groq</button>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="section-label">Email generado <span style="color:var(--text3);font-size:9px">(editable — se enviara a todos)</span></div>
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Borrador</span>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-ghost btn-sm" onclick="previewBulkEmail()">Vista HTML</button>
+            <button class="btn btn-ghost btn-sm" onclick="generateBulkEmail()">Regenerar</button>
+          </div>
+        </div>
+        <div class="generated-body" id="bulkBody" contenteditable="true" spellcheck="true">
+          <span style="color:var(--text3);font-style:normal;font-family:var(--mono);font-size:11px">El email generado aparecera aqui.</span>
+        </div>
+        <div class="panel-footer">
+          <span style="font-size:10px;color:var(--text3)" id="bulkRecipientCount">0 destinatarios</span>
+          <button class="btn btn-green btn-sm" onclick="openBulkConfirm()">Enviar a todos -&gt;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /shell -->
+
+<!-- ═══ MODAL: CONFIRM SEND ═══ -->
+<div class="modal-backdrop" id="modalSend">
+  <div class="modal">
+    <h2>Confirmar envio</h2>
+    <div class="info">Para: <b id="m-to"></b></div>
+    <div class="info">Asunto: <b id="m-subject"></b></div>
+    <div class="info">Via: <b id="m-via" style="color:var(--green)"></b></div>
+    <div class="warn">El email se enviara formateado en HTML con los estilos configurados. Esta accion no se puede deshacer.</div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeModal('modalSend')">Cancelar</button>
+      <button class="btn btn-green" style="flex:2;justify-content:center" id="btnConfirmSend" onclick="confirmSend()">Enviar ahora</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: VER EMAIL (supervision) ═══ -->
+<div class="modal-backdrop" id="modalEmail">
+  <div class="modal" style="max-width:720px">
+    <h2 id="modalEmailSubject" style="margin-bottom:6px">Email enviado</h2>
+    <div class="info" id="modalEmailMeta" style="margin-bottom:14px"></div>
+    <div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:8px">Texto plano</div>
+    <div id="modalEmailBody" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;font-size:12px;color:var(--text2);line-height:1.7;white-space:pre-wrap;max-height:200px;overflow-y:auto;margin-bottom:14px"></div>
+    <div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:8px">Vista HTML renderizada</div>
+    <iframe id="modalEmailHtml" style="width:100%;height:320px;border:1px solid var(--border);border-radius:var(--r);background:#fff"></iframe>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="closeModal('modalEmail')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: PREVIEW HTML COMPOSE ═══ -->
+<div class="modal-backdrop" id="modalPreview">
+  <div class="modal" style="max-width:720px">
+    <h2 style="margin-bottom:14px">Vista previa HTML</h2>
+    <iframe id="previewFrame" style="width:100%;height:420px;border:1px solid var(--border);border-radius:var(--r);background:#fff"></iframe>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="closeModal('modalPreview')">Cerrar</button>
+      <button class="btn btn-green" onclick="closeModal('modalPreview');openSendConfirm()">Enviar este email</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: ADD MEMORY ═══ -->
+<div class="modal-backdrop" id="modalMemory">
+  <div class="modal">
+    <h2>Agregar nota a la memoria</h2>
+    <div style="margin-bottom:10px">
+      <label style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);display:block;margin-bottom:6px">Tipo</label>
+      <select id="mem-type" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:7px 10px;font-family:var(--mono);font-size:12px;color:var(--text);outline:none">
+        <option value="nota">nota</option><option value="preferencia">preferencia</option>
+        <option value="acuerdo">acuerdo</option><option value="recordatorio">recordatorio</option>
+      </select>
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);display:block;margin-bottom:6px">Entidad (opcional)</label>
+      <input type="text" id="mem-entity" placeholder="nombre, email, empresa..."
+        style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:7px 10px;font-family:var(--mono);font-size:12px;color:var(--text);outline:none"/>
+    </div>
+    <div>
+      <label style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);display:block;margin-bottom:6px">Contenido</label>
+      <textarea id="mem-content" rows="4" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;font-family:var(--mono);font-size:12px;color:var(--text);outline:none;resize:none;line-height:1.6" placeholder="Informacion relevante..."></textarea>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeModal('modalMemory')">Cancelar</button>
+      <button class="btn btn-green" style="flex:2;justify-content:center" onclick="saveMemory()">Guardar nota</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ MODAL: CONFIRM BULK SEND ═══ -->
+<div class="modal-backdrop" id="modalBulk">
+  <div class="modal">
+    <h2>Confirmar envio multiple</h2>
+    <div class="info">Destinatarios: <b id="mb-count" style="color:var(--green)"></b></div>
+    <div class="info">Asunto: <b id="mb-subject"></b></div>
+    <div id="mb-list" style="max-height:160px;overflow-y:auto;margin-top:10px;font-size:11px;color:var(--text2);line-height:1.8"></div>
+    <div class="warn">Se enviara el mismo email a todos los destinatarios. Esta accion no se puede deshacer.</div>
+    <div id="bulkProgress" style="display:none;margin-top:12px">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:6px" id="bulkProgressText">Enviando...</div>
+      <div style="background:var(--bg3);border-radius:20px;height:4px;overflow:hidden">
+        <div id="bulkProgressBar" style="background:var(--green);height:100%;width:0%;transition:width .3s"></div>
+      </div>
+    </div>
+    <div id="bulkResults" style="display:none;margin-top:12px;max-height:120px;overflow-y:auto;font-size:11px;line-height:1.8"></div>
+    <div class="modal-btns" id="bulkModalBtns">
+      <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeModal('modalBulk')">Cancelar</button>
+      <button class="btn btn-green" style="flex:2;justify-content:center" id="btnConfirmBulk" onclick="confirmBulkSend()">Enviar ahora</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';  // mismo origen — Render sirve API + frontend juntos
+let contacts=[], inboxItems=[], currentIntent='profesional', bulkIntent='profesional';
+let editingContactId=null, selectedInboxMsg=null, bulkRecipients=new Set();
+let SESSION_TOKEN = localStorage.getItem('session_token') || '';
+
+// ── AUTH ──
+async function doLogin(){
+  const btn=document.getElementById('btnLogin');
+  const user=document.getElementById('loginUser').value.trim();
+  const pass=document.getElementById('loginPass').value;
+  if(!user||!pass)return;
+  btn.textContent='Ingresando...'; btn.disabled=true;
+  try{
+    const r=await fetch(API+'/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
+      credentials:'include',body:JSON.stringify({username:user,password:pass})});
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.detail||'Error');
+    SESSION_TOKEN=d.token;
+    localStorage.setItem('session_token',SESSION_TOKEN);
+    showApp();
+  }catch(e){
+    const el=document.getElementById('loginError');
+    el.style.display='block'; el.textContent=e.message==='Credenciales incorrectas'?'Usuario o contraseña incorrectos':'Error de conexion';
+  }finally{ btn.textContent='Ingresar'; btn.disabled=false; }
+}
+
+async function doLogout(){
+  try{ await apiFetch('/auth/logout',{method:'POST'}); }catch(e){}
+  SESSION_TOKEN=''; localStorage.removeItem('session_token');
+  document.getElementById('appShell').style.display='none';
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('loginUser').value='';
+  document.getElementById('loginPass').value='';
+}
+
+function showApp(){
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('appShell').style.display='flex';
+  loadDashboard(); loadContacts(); checkStatus();
+  setInterval(checkStatus,30000); setInterval(loadStats,60000);
+}
+
+async function checkAuth(){
+  try{
+    const r=await fetch(API+'/auth/check',{credentials:'include',
+      headers:SESSION_TOKEN?{'X-Session-Token':SESSION_TOKEN}:{}});
+    if(r.ok){ showApp(); return; }
+  }catch(e){}
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('appShell').style.display='none';
+}
+
+// ── API HELPER (agrega token automáticamente) ──
+async function apiFetch(path, opts={}){
+  const headers = {'Content-Type':'application/json', ...(opts.headers||{})};
+  if(SESSION_TOKEN) headers['X-Session-Token'] = SESSION_TOKEN;
+  const r = await fetch(API+path, {...opts, headers, credentials:'include'});
+  if(r.status===401){ doLogout(); throw new Error('Sesion expirada'); }
+  return r;
+}
+
+// ── UTILS ──
+let toastTimer;
+function toast(msg,type=''){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast '+type+' show';
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.className='toast',4500);
+}
+function closeModal(id){ document.getElementById(id).classList.remove('visible'); }
+function openModal(id){ document.getElementById(id).classList.add('visible'); }
+
+function go(view){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('view-'+view)?.classList.add('active');
+  const map={dashboard:'Dashboard',agenda:'Agenda',compose:'Redactar',inbox:'Bandeja',
+    supervision:'Supervision',memory:'Memoria',context:'Contexto',estilo:'Estilo',
+    settings:'SMTP',bulk:'Envio'};
+  document.querySelectorAll('.nav-item').forEach(n=>{
+    const txt=n.textContent.trim();
+    if(map[view]&&txt.startsWith(map[view].substring(0,5))) n.classList.add('active');
+  });
+  document.getElementById('pageTitle').textContent=map[view]||view;
+  if(view==='agenda')     loadContacts();
+  if(view==='inbox')      loadInbox();
+  if(view==='supervision')loadSupervision();
+  if(view==='memory')     loadMemory();
+  if(view==='settings')   loadSettings();
+  if(view==='context')    loadContext();
+  if(view==='estilo')     loadStyle();
+  if(view==='dashboard')  loadDashboard();
+  if(view==='bulk')       initBulk();
+}
+
+// ── STATUS ──
+async function checkStatus(){
+  const dot=document.getElementById('apiDot'), txt=document.getElementById('apiStatus');
+  try{
+    const r=await apiFetch('/');
+    if(r.ok){const d=await r.json();dot.classList.add('on');txt.textContent='conectado';document.getElementById('configUser').textContent=d.smtp_user;}
+    else{dot.classList.remove('on');txt.textContent='error';}
+  }catch(e){dot.classList.remove('on');txt.textContent='sin conexion';}
+}
+
+// ── STATS ──
+async function loadStats(){
+  try{
+    const d=await(await apiFetch('/stats')).json();
+    ['contacts','sent','inbox','replied','memory'].forEach(k=>{
+      const el=document.getElementById('s-'+k); if(el) el.textContent=d[k]??'-';
+    });
+    document.getElementById('tContacts').textContent=d.contacts??'-';
+    document.getElementById('tSent').textContent=d.sent??'-';
+    document.getElementById('tInbox').textContent=d.inbox??'-';
+  }catch(e){}
+}
+
+async function loadDashboard(){
+  await loadStats();
+  try{
+    const ctx=await(await apiFetch('/context')).json();
+    const el=document.getElementById('dashContext');
+    if(ctx.entity||ctx.mission){
+      el.innerHTML=(ctx.entity?`<div style="font-size:11px;color:var(--text2);margin-bottom:8px;line-height:1.6"><b style="color:var(--text3);font-size:9px;letter-spacing:.1em;text-transform:uppercase">Entidad</b><br>${ctx.entity.substring(0,120)}...</div>`:'')+
+        (ctx.mission?`<div style="font-size:11px;color:var(--green);line-height:1.6"><b style="color:var(--text3);font-size:9px;letter-spacing:.1em;text-transform:uppercase">Mision</b><br>${ctx.mission}</div>`:'');
+    }else{
+      el.innerHTML=`<div style="font-size:11px;color:var(--text3)">Sin contexto. <span style="color:var(--green);cursor:pointer" onclick="go('context')">Configurar -></span></div>`;
+    }
+  }catch(e){}
+  try{
+    const items=await(await apiFetch('/memory?limit=8')).json();
+    const el=document.getElementById('dashMemory');
+    el.innerHTML=items.length?items.map(m=>`<div class="mem-item"><span class="mem-type">${m.type}</span><span class="mem-content">${m.content}</span><span class="mem-date">${formatDate(m.created_at)}</span></div>`).join(''):'<div style="padding:14px;color:var(--text3);font-size:11px">Sin actividad aun.</div>';
+  }catch(e){}
+}
+
+// ── CONTACTS ──
+async function loadContacts(){
+  try{contacts=await(await apiFetch('/contacts')).json();renderContacts(contacts);}
+  catch(e){toast('Error cargando contactos','error');}
+}
+function renderContacts(list){
+  const el=document.getElementById('contactGrid');
+  if(!list.length){el.innerHTML='<div style="color:var(--text3);font-size:11px;padding:1rem">No hay contactos.</div>';return;}
+  el.innerHTML=list.map(c=>`
+    <div class="contact-card">
+      <div class="cc-name">${c.name}</div>
+      <div class="cc-email">${c.email}</div>
+      <div class="cc-meta">${[c.company,c.role].filter(Boolean).join(' · ')}</div>
+      ${c.context?`<div style="margin-top:8px;font-size:11px;color:var(--text3);line-height:1.5">${c.context.substring(0,80)}${c.context.length>80?'...':''}</div>`:''}
+      <div class="cc-tags">${(c.tags||'').split(',').filter(Boolean).map(t=>`<span class="tag">${t.trim()}</span>`).join('')}</div>
+      <div style="display:flex;gap:6px;margin-top:10px">
+        <button class="btn btn-ghost btn-sm" onclick="composeToContact(${c.id})">Redactar</button>
+        <button class="btn btn-ghost btn-sm" onclick="editContact(${c.id})">Editar</button>
+        <button class="btn btn-red btn-sm" onclick="deleteContact(${c.id})">x</button>
+      </div>
+    </div>`).join('');
+}
+function filterContacts(){
+  const q=document.getElementById('searchContact').value.toLowerCase();
+  renderContacts(contacts.filter(c=>c.name.toLowerCase().includes(q)||c.email.toLowerCase().includes(q)||(c.company||'').toLowerCase().includes(q)||(c.tags||'').toLowerCase().includes(q)));
+}
+function openNewContact(){editingContactId=null;['name','email','company','role','phone','context','tags'].forEach(f=>document.getElementById('cf-'+f).value='');document.getElementById('contactFormTitle').textContent='Nuevo contacto';document.getElementById('contactForm').style.display='block';}
+function editContact(id){const c=contacts.find(x=>x.id===id);if(!c)return;editingContactId=id;document.getElementById('cf-name').value=c.name||'';document.getElementById('cf-email').value=c.email||'';document.getElementById('cf-company').value=c.company||'';document.getElementById('cf-role').value=c.role||'';document.getElementById('cf-phone').value=c.phone||'';document.getElementById('cf-context').value=c.context||'';document.getElementById('cf-tags').value=c.tags||'';document.getElementById('contactFormTitle').textContent='Editar';document.getElementById('contactForm').style.display='block';}
+function cancelContact(){document.getElementById('contactForm').style.display='none';editingContactId=null;}
+async function saveContact(){
+  const data={name:document.getElementById('cf-name').value.trim(),email:document.getElementById('cf-email').value.trim(),company:document.getElementById('cf-company').value.trim(),role:document.getElementById('cf-role').value.trim(),phone:document.getElementById('cf-phone').value.trim(),context:document.getElementById('cf-context').value.trim(),tags:document.getElementById('cf-tags').value.trim()};
+  if(!data.name||!data.email)return toast('Nombre y email requeridos','error');
+  const btn=document.getElementById('btnSaveContact');btn.disabled=true;btn.innerHTML='<span class="spinner spinner-dk"></span>';
+  try{
+    const url='/contacts'+(editingContactId?'/'+editingContactId:''),method=editingContactId?'PUT':'POST';
+    const r=await apiFetch(url,{method,body:JSON.stringify(data)});
+    if(!r.ok){const e=await r.json();throw new Error(e.detail||'Error');}
+    toast(editingContactId?'Actualizado':'Guardado','success');cancelContact();loadContacts();loadStats();
+  }catch(e){toast('Error: '+e.message,'error');}
+  finally{btn.disabled=false;btn.textContent='Guardar';}
+}
+async function deleteContact(id){if(!confirm('Eliminar contacto?'))return;await apiFetch('/contacts/'+id,{method:'DELETE'});toast('Eliminado');loadContacts();loadStats();}
+function composeToContact(id){const c=contacts.find(x=>x.id===id);if(!c)return;document.getElementById('c-to').value=c.email;matchContact();go('compose');}
+
+// ── COMPOSE ──
+function setIntent(i){currentIntent=i;document.querySelectorAll('.intent-btn').forEach(b=>b.classList.toggle('active',b.textContent.toLowerCase()===i));}
+document.getElementById('c-prompt').addEventListener('input',function(){document.getElementById('promptCount').textContent=this.value.length;});
+
+function matchContact(){
+  const email=document.getElementById('c-to').value.trim().toLowerCase();
+  const c=contacts.find(x=>x.email.toLowerCase()===email);
+  const hint=document.getElementById('contactHint'),ctxBox=document.getElementById('contactContextBox');
+  if(c){hint.style.display='block';hint.innerHTML=`Contacto: <b style="color:var(--text2)">${c.name}</b>${c.company?' · '+c.company:''}`;if(c.context){ctxBox.style.display='block';document.getElementById('contactContextContent').textContent=c.context;}else ctxBox.style.display='none';}
+  else{hint.style.display='none';ctxBox.style.display='none';}
+}
+
+async function getEntityContext(){
+  try{const ctx=await(await apiFetch('/context')).json();
+    if(ctx.entity||ctx.mission||ctx.extra)return `
+
+CONTEXTO DE LA ENTIDAD:
+${ctx.entity?'Entidad: '+ctx.entity+'
+':''}${ctx.mission?'Mision: '+ctx.mission+'
+':''}${ctx.extra?'Instrucciones: '+ctx.extra:''}`;
+  }catch(e){}
+  return '';
+}
+
+const intentPrompts={profesional:'tono profesional y formal',seguimiento:'seguimiento amable y directo, recordando el contacto previo',reunion:'solicitar reunion, claro sobre proposito y fecha sugerida',crowdfunding:'campana crowdfunding: persuasivo, llamada a la accion clara, mencionar tiers si hay contexto',propuesta:'propuesta comercial clara con beneficios concretos',informal:'tono amigable e informal'};
+
+async function composeEmail(){
+  const key=document.getElementById('groqKey').value.trim();
+  const to=document.getElementById('c-to').value.trim();
+  const subject=document.getElementById('c-subject').value.trim();
+  const prompt=document.getElementById('c-prompt').value.trim();
+  if(!key)return toast('Ingresa tu Groq API Key','error');
+  if(!to)return toast('Ingresa el destinatario','error');
+  if(!subject)return toast('Ingresa el asunto','error');
+  if(!prompt)return toast('Describe el email','error');
+  const c=contacts.find(x=>x.email.toLowerCase()===to.toLowerCase());
+  let contactInfo=c?`
+
+CONTACTO:
+Nombre: ${c.name}
+Empresa: ${c.company||'N/A'}
+Rol: ${c.role||'N/A'}
+Contexto: ${c.context||'N/A'}`:'';
+  const entityInfo=await getEntityContext();
+  const btn=document.getElementById('btnCompose');btn.disabled=true;btn.innerHTML='<span class="spinner spinner-dk"></span> Generando...';
+  const body=document.getElementById('composedBody');body.textContent='';body.classList.add('streaming');
+  try{
+    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:'llama-3.3-70b-versatile',stream:true,messages:[{role:'system',content:`Eres asistente ejecutivo experto en comunicaciones profesionales en espanol. Escribe el cuerpo del email en Markdown (usa **negrita**, *italica*, listas, ##titulos). NO incluyas encabezados como Para/De/Asunto. Usa ${intentPrompts[currentIntent]||'tono profesional'}. Destinatario: ${to}. Asunto: ${subject}.${contactInfo}${entityInfo}`},{role:'user',content:prompt}]})});
+    if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'Error Groq');}
+    const reader=res.body.getReader(),decoder=new TextDecoder();let buffer='';
+    while(true){const{done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const lines=buffer.split('
+');buffer=lines.pop();for(const line of lines){const clean=line.replace(/^data: /,'').trim();if(!clean||clean==='[DONE]')continue;try{body.textContent+=JSON.parse(clean).choices?.[0]?.delta?.content||'';}catch{}}}
+    body.classList.remove('streaming');
+  }catch(e){toast('Error Groq: '+e.message,'error');body.classList.remove('streaming');}
+  finally{btn.disabled=false;btn.innerHTML='<svg width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5.5" cy="5.5" r="4.5" stroke="#0c0f0a" stroke-width="1.2"/><path d="M5.5 3v5M3 5.5h5" stroke="#0c0f0a" stroke-width="1.2" stroke-linecap="round"/></svg> Generar con Groq';}
+}
+
+function clearCompose(){document.getElementById('composedBody').innerHTML='<span style="color:var(--text3);font-style:normal;font-family:var(--mono);font-size:11px">El email generado aparecera aqui.</span>';}
+
+async function previewEmail(){
+  const bodyText=document.getElementById('composedBody').textContent.trim();
+  if(!bodyText||bodyText.includes('aparecera aqui'))return toast('Genera un email primero','error');
+  try{const r=await apiFetch('/preview-email',{method:'POST',body:JSON.stringify({body:bodyText})});const d=await r.json();document.getElementById('previewFrame').srcdoc=d.html;openModal('modalPreview');}catch(e){toast('Error preview','error');}
+}
+
+async function openSendConfirm(){
+  const bodyText=document.getElementById('composedBody').textContent.trim();
+  if(!bodyText||bodyText.includes('aparecera aqui'))return toast('Genera un email primero','error');
+  const to=document.getElementById('c-to').value.trim(),subject=document.getElementById('c-subject').value.trim();
+  if(!to||!subject)return toast('Completa destinatario y asunto','error');
+  try{const d=await(await apiFetch('/config')).json();document.getElementById('m-via').textContent=d.smtp_method+' · '+d.smtp_user;}catch(e){}
+  document.getElementById('m-to').textContent=to;document.getElementById('m-subject').textContent=subject;openModal('modalSend');
+}
+
+async function confirmSend(){
+  const btn=document.getElementById('btnConfirmSend');btn.disabled=true;btn.innerHTML='<span class="spinner spinner-dk"></span> Enviando...';
+  try{
+    const r=await apiFetch('/send-email',{method:'POST',body:JSON.stringify({to:document.getElementById('c-to').value.trim(),subject:document.getElementById('c-subject').value.trim(),body:document.getElementById('composedBody').textContent.trim(),intent:currentIntent})});
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.detail||'Error');
+    const failed=d.results?.filter(x=>!x.ok)||[];
+    if(failed.length)throw new Error(failed[0].error||'Error de envio');
+    closeModal('modalSend');toast('Email enviado exitosamente','success');clearCompose();
+    document.getElementById('c-to').value='';document.getElementById('c-subject').value='';document.getElementById('c-prompt').value='';document.getElementById('promptCount').textContent='0';loadStats();
+  }catch(e){toast('Error: '+e.message,'error');}
+  finally{btn.disabled=false;btn.textContent='Enviar ahora';}
+}
+
+// ── INBOX ──
+async function loadInbox(){
+  document.getElementById('inboxList').innerHTML='<div style="padding:14px;color:var(--text3);font-size:11px">Cargando cache...</div>';
+  try{const d=await(await apiFetch('/inbox')).json();inboxItems=d.messages||d;renderInbox();}
+  catch(e){document.getElementById('inboxList').innerHTML='<div style="padding:14px;color:var(--text3);font-size:11px">Error cargando bandeja.</div>';}
+}
+async function refreshInbox(){
+  const btn=document.getElementById('btnRefresh');btn.disabled=true;btn.innerHTML='<span class="spinner spinner-dk"></span> Sincronizando...';
+  try{
+    const d=await(await apiFetch('/inbox?refresh=true')).json();
+    inboxItems=d.messages||d;
+    renderInbox();
+    const sync=d.sync||{};
+    if(sync.error)toast('IMAP error: '+sync.error,'error');
+    else toast(`Sincronizado: +${sync.added||0} nuevos, -${sync.deleted||0} eliminados`,'success');
+  }catch(e){toast('Error IMAP: '+e.message,'error');}
+  finally{btn.disabled=false;btn.textContent='Actualizar IMAP';}
+}
+function renderInbox(){
+  const list=document.getElementById('inboxList');
+  document.getElementById('inboxCount').textContent=inboxItems.length+' mensajes';
+  if(!inboxItems.length){list.innerHTML='<div style="padding:14px;color:var(--text3);font-size:11px">Bandeja vacia. Presiona Actualizar IMAP.</div>';return;}
+  list.innerHTML=inboxItems.map(m=>`
+    <div class="inbox-item" onclick="selectInbox('${escId(m.message_id)}')">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="ii-from">${m.from_name||m.from_email}</div>
+        ${m.replied?'<span class="ii-badge">Respondido</span>':''}
+      </div>
+      <div class="ii-subject">${m.subject||'(sin asunto)'}</div>
+      <div class="ii-date">${formatDate(m.date)}</div>
+    </div>`).join('');
+}
+function escId(s){return(s||'').replace(/'/g,"\'").replace(/"/g,'\"');}
+async function selectInbox(mid){
+  const m=inboxItems.find(x=>(x.message_id||'')==mid);if(!m)return;selectedInboxMsg=m;
+  document.querySelectorAll('.inbox-item').forEach(i=>i.classList.remove('selected'));
+  event.currentTarget?.classList.add('selected');
+  const detail=document.getElementById('inboxDetail');
+  detail.innerHTML=`<h3 style="font-family:var(--serif);font-size:16px;font-weight:400;margin-bottom:6px">${m.subject||'(sin asunto)'}</h3><div style="font-size:10px;color:var(--text3);margin-bottom:14px">De: ${m.from_name||''} &lt;${m.from_email}&gt; · ${formatDate(m.date)}</div><div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:12px;font-size:12px;color:var(--text2);line-height:1.7;white-space:pre-wrap;max-height:220px;overflow-y:auto;margin-bottom:14px">${m.body||''}</div>${m.ai_suggestion?`<div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:6px">Propuesta IA</div><div class="ai-sug" style="background:rgba(126,200,80,.04);border:1px solid rgba(126,200,80,.12);border-radius:var(--r);padding:12px;font-size:13px;font-style:italic;font-family:var(--serif);color:var(--text2);line-height:1.8;white-space:pre-wrap;margin-bottom:14px">${m.ai_suggestion}</div>`:'<div style="font-size:11px;color:var(--text3);margin-bottom:14px">Sin propuesta generada.</div>'}<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-green btn-sm" onclick="generateReply()">Generar respuesta IA</button><button class="btn btn-ghost btn-sm" onclick="replyWith()">Usar propuesta</button><button class="btn btn-amber btn-sm" onclick="markReplied('${escId(mid)}')">Marcar respondido</button></div>`;
+}
+async function generateReply(){
+  const m=selectedInboxMsg;if(!m)return;const key=document.getElementById('groqKey').value.trim();if(!key)return toast('Ingresa tu Groq API Key','error');
+  const detail=document.getElementById('inboxDetail');let sugDiv=detail.querySelector('.ai-sug');
+  if(!sugDiv){sugDiv=document.createElement('div');sugDiv.className='ai-sug';sugDiv.style.cssText='background:rgba(126,200,80,.04);border:1px solid rgba(126,200,80,.12);border-radius:9px;padding:12px;font-size:13px;font-style:italic;font-family:var(--serif);color:var(--text2);line-height:1.8;margin-bottom:14px';detail.insertBefore(sugDiv,detail.querySelector('.btn'));}
+  sugDiv.textContent='Generando...';
+  try{
+    const entityInfo=await getEntityContext();
+    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:'llama-3.3-70b-versatile',stream:false,messages:[{role:'system',content:`Eres asistente ejecutivo. Genera respuesta profesional breve en espanol, en Markdown. Solo el cuerpo.${entityInfo}`},{role:'user',content:`Email recibido:
+De: ${m.from_name} <${m.from_email}>
+Asunto: ${m.subject}
+
+${m.body}
+
+Redacta una respuesta.`}]})});
+    const d=await res.json();const suggestion=d.choices?.[0]?.message?.content||'';
+    sugDiv.textContent=suggestion;
+    await apiFetch('/inbox/save-suggestion',{method:'POST',body:JSON.stringify({message_id:m.message_id,suggestion})});
+    m.ai_suggestion=suggestion;toast('Propuesta generada','success');
+  }catch(e){sugDiv.textContent='Error: '+e.message;}
+}
+function replyWith(){const m=selectedInboxMsg;if(!m||!m.ai_suggestion)return toast('Genera una propuesta primero','error');document.getElementById('c-to').value=m.from_email;document.getElementById('c-subject').value='Re: '+(m.subject||'');document.getElementById('composedBody').textContent=m.ai_suggestion;go('compose');}
+async function markReplied(mid){await apiFetch('/inbox/mark-replied',{method:'POST',body:JSON.stringify({message_id:mid})});toast('Marcado como respondido');loadInbox();}
+
+// ── SUPERVISION ──
+async function loadSupervision(){
+  try{
+    const rows=await(await apiFetch('/supervision')).json();
+    const el=document.getElementById('supervisionList');
+    if(!rows.length){el.innerHTML='<div style="padding:14px;color:var(--text3);font-size:11px">Sin emails enviados.</div>';return;}
+    el.innerHTML=rows.map(row=>{
+      const hrs=row.hours_since_sent;
+      const hrsStr=hrs!==null?(hrs>48?Math.round(hrs/24)+'d':hrs+'h'):'-';
+      const hrsCol=hrs>48?'var(--red)':hrs>24?'var(--amber)':'var(--text2)';
+      return `<div class="sup-row"><span style="color:var(--text3)">${formatDate(row.sent_at)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${row.contact_email}">${row.contact_name||row.contact_email}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">${row.subject||'-'}</span><span style="color:${hrsCol}">${hrsStr}</span><span>${row.has_reply?'<span class="status-ok">Si</span>':'<span class="status-no">No</span>'}</span><button class="open-email-btn" onclick="openEmailModal(${row.id})">Ver email</button></div>`;
+    }).join('');
+  }catch(e){toast('Error supervision','error');}
+}
+async function openEmailModal(logId){
+  try{const row=await(await apiFetch('/logs/'+logId)).json();document.getElementById('modalEmailSubject').textContent=row.subject||'(sin asunto)';document.getElementById('modalEmailMeta').innerHTML=`Para: <b>${row.contact_name||row.contact_email}</b> &lt;${row.contact_email}&gt; · ${formatDate(row.sent_at)} · ${row.intent||''}`;document.getElementById('modalEmailBody').textContent=row.body||'';document.getElementById('modalEmailHtml').srcdoc=row.body_html||'<html><body style="display:flex;align-items:center;justify-content:center;height:100%;color:#aaa;font-family:sans-serif;font-size:13px">Sin HTML</body></html>';openModal('modalEmail');}catch(e){toast('Error cargando email','error');}
+}
+
+// ── MEMORY ──
+async function loadMemory(){
+  try{const items=await(await apiFetch('/memory?limit=100')).json();const el=document.getElementById('memoryList');el.innerHTML=items.length?items.map(m=>`<div class="mem-item"><span class="mem-type">${m.type}</span><div style="flex:1">${m.entity?`<div style="font-size:10px;color:var(--text3);margin-bottom:2px">${m.entity}</div>`:''}<div class="mem-content">${m.content}</div></div><span class="mem-date">${formatDate(m.created_at)}</span></div>`).join(''):'<div style="padding:14px;color:var(--text3);font-size:11px">Sin memorias.</div>';}catch(e){}
+}
+function openAddMemory(){document.getElementById('mem-type').value='nota';document.getElementById('mem-entity').value='';document.getElementById('mem-content').value='';openModal('modalMemory');}
+async function saveMemory(){const content=document.getElementById('mem-content').value.trim();if(!content)return toast('Escribe el contenido','error');try{await apiFetch('/memory',{method:'POST',body:JSON.stringify({type:document.getElementById('mem-type').value,entity:document.getElementById('mem-entity').value.trim(),content})});closeModal('modalMemory');toast('Nota guardada','success');loadMemory();loadStats();}catch(e){toast('Error','error');}}
+
+// ── CONTEXT ──
+async function loadContext(){try{const d=await(await apiFetch('/context')).json();document.getElementById('ctx-entity').value=d.entity||'';document.getElementById('ctx-mission').value=d.mission||'';document.getElementById('ctx-extra').value=d.extra||'';}catch(e){}}
+async function saveContext(){try{await apiFetch('/context',{method:'POST',body:JSON.stringify({entity:document.getElementById('ctx-entity').value.trim(),mission:document.getElementById('ctx-mission').value.trim(),extra:document.getElementById('ctx-extra').value.trim()})});toast('Contexto guardado','success');loadDashboard();}catch(e){toast('Error','error');}}
+
+// ── ESTILO ──
+function syncColor(inputId,hexId){const picker=document.getElementById(inputId),hex=document.getElementById(hexId);picker.addEventListener('input',()=>hex.value=picker.value);hex.addEventListener('input',()=>{if(/^#[0-9a-f]{6}$/i.test(hex.value))picker.value=hex.value;});}
+async function loadStyle(){try{const d=await(await apiFetch('/settings')).json();const set=(id,k,def)=>{const el=document.getElementById(id);if(el)el.value=d[k]||def;};set('st-font','style_font_family',"Georgia, 'Times New Roman', serif");set('st-size','style_font_size','16px');set('st-primary','style_primary_color','#7ec850');set('st-primary-hex','style_primary_color','#7ec850');set('st-link','style_link_color','#2563eb');set('st-link-hex','style_link_color','#2563eb');set('st-bg','style_bg_color','#ffffff');set('st-bg-hex','style_bg_color','#ffffff');set('st-text','style_text_color','#1a1a1a');set('st-text-hex','style_text_color','#1a1a1a');set('st-header-bg','style_header_bg','#0c0f0a');set('st-header-bg-hex','style_header_bg','#0c0f0a');set('st-header-fc','style_header_color','#7ec850');set('st-header-fc-hex','style_header_color','#7ec850');set('st-sig','signature_html','');}catch(e){}}
+async function saveStyle(){const data={style_font_family:document.getElementById('st-font').value,style_font_size:document.getElementById('st-size').value,style_primary_color:document.getElementById('st-primary-hex').value||document.getElementById('st-primary').value,style_link_color:document.getElementById('st-link-hex').value||document.getElementById('st-link').value,style_bg_color:document.getElementById('st-bg-hex').value||document.getElementById('st-bg').value,style_text_color:document.getElementById('st-text-hex').value||document.getElementById('st-text').value,style_header_bg:document.getElementById('st-header-bg-hex').value||document.getElementById('st-header-bg').value,style_header_color:document.getElementById('st-header-fc-hex').value||document.getElementById('st-header-fc').value,signature_html:document.getElementById('st-sig').value};try{await apiFetch('/settings',{method:'POST',body:JSON.stringify(data)});toast('Estilos guardados','success');}catch(e){toast('Error','error');}}
+async function previewStyle(){const sampleBody=`# Hola, aqui tu email
+
+Este es un parrafo con **negrita** y *italica* y [un enlace](https://ejemplo.com).
+
+- Item uno
+- Item dos
+
+Saludos cordiales,`;const data={body:sampleBody,font_family:document.getElementById('st-font').value,font_size:document.getElementById('st-size').value,primary_color:document.getElementById('st-primary-hex').value||document.getElementById('st-primary').value,link_color:document.getElementById('st-link-hex').value||document.getElementById('st-link').value,bg_color:document.getElementById('st-bg-hex').value||document.getElementById('st-bg').value,text_color:document.getElementById('st-text-hex').value||document.getElementById('st-text').value,header_bg:document.getElementById('st-header-bg-hex').value||document.getElementById('st-header-bg').value,header_color:document.getElementById('st-header-fc-hex').value||document.getElementById('st-header-fc').value,signature_html:document.getElementById('st-sig').value};try{const r=await apiFetch('/preview-email',{method:'POST',body:JSON.stringify(data)});const d=await r.json();document.getElementById('stylePreview').srcdoc=d.html;}catch(e){toast('Error preview','error');}}
+async function previewBulkEmail(){const bodyText=document.getElementById('bulkBody').textContent.trim();if(!bodyText||bodyText.includes('aparecera aqui'))return toast('Genera un email primero','error');try{const r=await apiFetch('/preview-email',{method:'POST',body:JSON.stringify({body:bodyText})});const d=await r.json();document.getElementById('previewFrame').srcdoc=d.html;openModal('modalPreview');}catch(e){toast('Error preview','error');}}
+
+// ── SETTINGS ──
+async function loadSettings(){try{const d=await(await apiFetch('/config')).json();document.getElementById('s-smtp-method').value=d.smtp_method||'smtp_ssl';document.getElementById('s-smtp-host').value=d.smtp_host||'';document.getElementById('s-smtp-port').value=d.smtp_port||'465';document.getElementById('s-smtp-user').value=d.smtp_user||'';document.getElementById('s-sender-name').value=d.sender_name||'';document.getElementById('s-imap-host').value=d.imap_host||'';document.getElementById('s-imap-port').value=d.imap_port||'993';document.getElementById('s-imap-user').value=d.imap_user||'';}catch(e){}}
+async function saveSettings(){const btn=document.getElementById('btnSaveSettings');btn.disabled=true;btn.innerHTML='<span class="spinner spinner-dk"></span>';const data={smtp_method:document.getElementById('s-smtp-method').value,smtp_host:document.getElementById('s-smtp-host').value.trim(),smtp_port:document.getElementById('s-smtp-port').value.trim(),smtp_user:document.getElementById('s-smtp-user').value.trim(),sender_name:document.getElementById('s-sender-name').value.trim(),imap_host:document.getElementById('s-imap-host').value.trim(),imap_port:document.getElementById('s-imap-port').value.trim(),imap_user:document.getElementById('s-imap-user').value.trim()};const p=document.getElementById('s-smtp-pass').value;if(p)data.smtp_pass=p;const ip=document.getElementById('s-imap-pass').value;if(ip)data.imap_pass=ip;try{await apiFetch('/config',{method:'POST',body:JSON.stringify(data)});toast('Guardado — nota: en Render las credenciales se configuran en Environment Variables','success');checkStatus();}catch(e){toast('Error','error');}finally{btn.disabled=false;btn.textContent='Guardar configuracion';}}
+async function testAPI(){const res=document.getElementById('settingsResult');res.style.display='block';res.style.background='var(--bg3)';res.style.borderColor='var(--border)';res.style.color='var(--text2)';res.textContent='Probando...';try{const d=await(await apiFetch('/')).json();res.style.borderColor='rgba(126,200,80,.2)';res.style.color='var(--text2)';res.innerHTML=`<span style="color:var(--green)">API online</span> · SMTP: ${d.smtp_user} · IMAP: ${d.imap_host||'no configurado'}`;}catch(e){res.style.borderColor='rgba(192,80,80,.3)';res.style.color='var(--red)';res.textContent='Sin conexion: '+e.message;}}
+
+// ── BULK SEND ──
+function setBulkIntent(i){bulkIntent=i;document.querySelectorAll('#view-bulk .intent-btn').forEach(b=>b.classList.toggle('active',b.textContent.toLowerCase()===i));}
+
+function initBulk(){
+  bulkRecipients.clear();
+  const list=document.getElementById('bulkContactList');
+  list.innerHTML=contacts.map(c=>`
+    <button class="tag" style="cursor:pointer;padding:4px 10px;font-size:10px" onclick="toggleBulkContact('${c.email}','${c.name}',this)">
+      ${c.name}
+    </button>`).join('');
+  updateBulkCount();
+}
+
+function toggleBulkContact(email,name,btn){
+  if(bulkRecipients.has(email)){bulkRecipients.delete(email);btn.style.background='';btn.style.color='';btn.style.borderColor='';}
+  else{bulkRecipients.add(email);btn.style.background='rgba(126,200,80,.15)';btn.style.color='var(--green)';btn.style.borderColor='var(--green)';}
+  updateBulkCount();
+}
+
+function getBulkRecipients(){
+  const all=new Set(bulkRecipients);
+  const extra=document.getElementById('bulk-extra').value;
+  extra.split(/[
+,;]+/).map(e=>e.trim()).filter(e=>e.includes('@')).forEach(e=>all.add(e));
+  return [...all];
+}
+
+function updateBulkCount(){
+  const total=getBulkRecipients().length;
+  const el=document.getElementById('bulkRecipientCount');
+  if(el) el.textContent=total+' destinatario'+(total!==1?'s':'');
+  const sel=document.getElementById('bulkSelected');
+  if(sel){
+    const all=getBulkRecipients();
+    sel.innerHTML=all.map(e=>`<span class="tag" style="color:var(--green);border-color:var(--green-dim)">${e}</span>`).join('');
+  }
+}
+
+document.getElementById('bulk-extra')?.addEventListener('input', updateBulkCount);
+
+async function generateBulkEmail(){
+  const key=document.getElementById('groqKey').value.trim();
+  const subject=document.getElementById('bulk-subject').value.trim();
+  const prompt=document.getElementById('bulk-prompt').value.trim();
+  if(!key)return toast('Ingresa tu Groq API Key','error');
+  if(!subject)return toast('Ingresa el asunto','error');
+  if(!prompt)return toast('Describe el email','error');
+  const entityInfo=await getEntityContext();
+  const btn=document.getElementById('btnBulkGenerate');btn.disabled=true;btn.innerHTML='<span class="spinner spinner-dk"></span> Generando...';
+  const body=document.getElementById('bulkBody');body.textContent='';body.classList.add('streaming');
+  try{
+    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:'llama-3.3-70b-versatile',stream:true,messages:[{role:'system',content:`Eres asistente ejecutivo experto en comunicaciones en espanol. Escribe el cuerpo del email en Markdown (**negrita**, *italica*, listas, ##titulos). NO incluyas encabezados Para/De/Asunto. Usa ${intentPrompts[bulkIntent]||'tono profesional'}. Asunto: ${subject}.${entityInfo}`},{role:'user',content:prompt}]})});
+    if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'Error Groq');}
+    const reader=res.body.getReader(),decoder=new TextDecoder();let buffer='';
+    while(true){const{done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const lines=buffer.split('
+');buffer=lines.pop();for(const line of lines){const clean=line.replace(/^data: /,'').trim();if(!clean||clean==='[DONE]')continue;try{body.textContent+=JSON.parse(clean).choices?.[0]?.delta?.content||'';}catch{}}}
+    body.classList.remove('streaming');
+  }catch(e){toast('Error Groq: '+e.message,'error');body.classList.remove('streaming');}
+  finally{btn.disabled=false;btn.textContent='Generar con Groq';}
+}
+
+function openBulkConfirm(){
+  const recipients=getBulkRecipients();
+  if(!recipients.length)return toast('Selecciona al menos un destinatario','error');
+  const bodyText=document.getElementById('bulkBody').textContent.trim();
+  if(!bodyText||bodyText.includes('aparecera aqui'))return toast('Genera el email primero','error');
+  const subject=document.getElementById('bulk-subject').value.trim();
+  if(!subject)return toast('Ingresa el asunto','error');
+  document.getElementById('mb-count').textContent=recipients.length+' destinatario'+(recipients.length!==1?'s':'');
+  document.getElementById('mb-subject').textContent=subject;
+  document.getElementById('mb-list').innerHTML=recipients.map(e=>`<span style="display:inline-block;margin-right:8px">&#x2022; ${e}</span>`).join('');
+  document.getElementById('bulkProgress').style.display='none';
+  document.getElementById('bulkResults').style.display='none';
+  document.getElementById('bulkModalBtns').style.display='flex';
+  openModal('modalBulk');
+}
+
+async function confirmBulkSend(){
+  const recipients=getBulkRecipients();
+  const bodyText=document.getElementById('bulkBody').textContent.trim();
+  const subject=document.getElementById('bulk-subject').value.trim();
+  const btn=document.getElementById('btnConfirmBulk');
+  btn.disabled=true;
+  document.getElementById('bulkModalBtns').style.display='none';
+  document.getElementById('bulkProgress').style.display='block';
+  document.getElementById('bulkProgressText').textContent=`Enviando a ${recipients.length} destinatarios...`;
+  document.getElementById('bulkProgressBar').style.width='10%';
+  try{
+    const r=await apiFetch('/send-email',{method:'POST',body:JSON.stringify({recipients,subject,body:bodyText,intent:bulkIntent})});
+    document.getElementById('bulkProgressBar').style.width='100%';
+    const d=await r.json();
+    const results=d.results||[];
+    const ok=results.filter(x=>x.ok),fail=results.filter(x=>!x.ok);
+    document.getElementById('bulkProgressText').textContent=`Completado: ${ok.length} enviados, ${fail.length} fallidos`;
+    if(results.length){
+      document.getElementById('bulkResults').style.display='block';
+      document.getElementById('bulkResults').innerHTML=results.map(r=>`<div style="color:${r.ok?'var(--green)':'var(--red)'}">${r.ok?'&#x2713;':'&#x2717;'} ${r.to}${r.error?' — '+r.error:''}</div>`).join('');
+    }
+    document.getElementById('bulkModalBtns').innerHTML='<button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeModal('modalBulk')">Cerrar</button>';
+    document.getElementById('bulkModalBtns').style.display='flex';
+    toast(`${ok.length} emails enviados${fail.length?' ('+fail.length+' fallidos)':''}`,fail.length?'':'success');
+    loadStats();
+  }catch(e){
+    document.getElementById('bulkProgressText').textContent='Error: '+e.message;
+    document.getElementById('bulkModalBtns').innerHTML='<button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeModal('modalBulk')">Cerrar</button>';
+    document.getElementById('bulkModalBtns').style.display='flex';
+    toast('Error: '+e.message,'error');
+  }
+}
+
+// ── COLOR SYNC ──
+function syncColor(inputId,hexId){const picker=document.getElementById(inputId),hex=document.getElementById(hexId);if(!picker||!hex)return;picker.addEventListener('input',()=>hex.value=picker.value);hex.addEventListener('input',()=>{if(/^#[0-9a-f]{6}$/i.test(hex.value))picker.value=hex.value;});}
+['primary','link','bg','text','header-bg','header-fc'].forEach(id=>syncColor('st-'+id,'st-'+id+'-hex'));
+
+// ── HELPERS ──
+function formatDate(d){if(!d)return'-';try{const dt=new Date(d),now=new Date(),diff=now-dt;if(diff<86400000)return dt.toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});return dt.toLocaleDateString('es',{day:'2-digit',month:'short'});}catch(e){return(d||'').substring(0,10);}}
+
+// ── INIT ──
+window.addEventListener('DOMContentLoaded', checkAuth);
+</script>
+</body>
+</html>
