@@ -202,7 +202,7 @@ def md_to_html(text: str) -> str:
 # HTML EMAIL BUILDER
 # ─────────────────────────────────────────────
 def build_html_email(body_text: str, style_cfg: dict = None) -> str:
-    s = style_cfg or {}
+    s         = style_cfg or {}
     primary   = s.get("primary_color",  "#7ec850")
     bg        = s.get("bg_color",       "#ffffff")
     text_col  = s.get("text_color",     "#1a1a1a")
@@ -212,17 +212,76 @@ def build_html_email(body_text: str, style_cfg: dict = None) -> str:
     header_bg = s.get("header_bg",      "#0c0f0a")
     header_fc = s.get("header_color",   "#7ec850")
     sname     = s.get("sender_name",    cfg()["sender_name"])
-    sig_html  = s.get("signature_html", get_setting("signature_html",""))
+    sig_html  = s.get("signature_html", get_setting("signature_html", ""))
     body_html = md_to_html(body_text).replace("LINKCOLOR", link_col)
-    sig_block = f'<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:28px;border-top:2px solid {primary};padding-top:18px">\\<td style="font-size:13px;color:#555;font-family:{font}">{sig_html}</td>\\</table>' if sig_html else ""
-    return f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f4f4f4;font-family:{font}">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:24px 0">\\<td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:{bg};border-radius:10px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
-\\<td style="background:{header_bg};padding:22px 32px"><span style="font-family:Georgia,serif;font-size:20px;font-weight:600;color:{header_fc};letter-spacing:-0.5px">{sname}</span></td>
-\\<td style="padding:32px 36px 24px;font-size:{fsize};color:{text_col};line-height:1.75;font-family:{font}">{body_html}{sig_block}</td>
-\\<td style="background:#f8f8f8;border-top:1px solid #e8e8e8;padding:14px 36px"><p style="margin:0;font-size:12px;color:#999;font-family:Arial,sans-serif">Enviado desde <strong>{sname}</strong>.</p></td>
-</table></td></table></body></html>"""
+
+    sig_block = ""
+    if sig_html:
+        sig_block = (
+            '<tr><td style="padding:0 36px 24px 36px">'
+            '<table width="100%" cellpadding="0" cellspacing="0" border="0">'
+            '<tr><td style="border-top:2px solid ' + primary + ';padding-top:16px;'
+            'font-size:13px;color:#666;font-family:Arial,sans-serif;line-height:1.5">'
+            + sig_html +
+            '</td></tr></table></td></tr>'
+        )
+
+    footer_name = sname or "Asistente Ejecutivo"
+
+    return (
+        '<!DOCTYPE html>'
+        '<html lang="es" xmlns="http://www.w3.org/1999/xhtml">'
+        '<head>'
+        '<meta charset="UTF-8"/>'
+        '<meta name="viewport" content="width=device-width,initial-scale=1"/>'
+        '<meta http-equiv="X-UA-Compatible" content="IE=edge"/>'
+        '<title>Email</title>'
+        '</head>'
+        '<body style="margin:0;padding:0;background-color:#f0f0f0;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%">'
+        # Wrapper externo
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
+        ' style="background-color:#f0f0f0;padding:32px 16px">'
+        '<tr><td align="center">'
+        # Contenedor principal 600px
+        '<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"'
+        ' style="max-width:600px;width:100%">'
+
+        # ── HEADER ──
+        '<tr>'
+        '<td style="background-color:' + header_bg + ';border-radius:10px 10px 0 0;padding:24px 36px">'
+        '<span style="font-family:Georgia,serif;font-size:21px;font-weight:700;'
+        'color:' + header_fc + ';letter-spacing:-0.3px;line-height:1">'
+        + (sname or "") +
+        '</span>'
+        '</td>'
+        '</tr>'
+
+        # ── BODY ──
+        '<tr>'
+        '<td style="background-color:' + bg + ';padding:36px 36px 28px 36px;'
+        'font-family:' + font + ';font-size:' + fsize + ';color:' + text_col + ';line-height:1.75">'
+        + body_html +
+        '</td>'
+        '</tr>'
+
+        # ── FIRMA (opcional) ──
+        + sig_block +
+
+        # ── FOOTER ──
+        '<tr>'
+        '<td style="background-color:#f8f8f8;border-radius:0 0 10px 10px;'
+        'border-top:1px solid #e4e4e4;padding:16px 36px">'
+        '<p style="margin:0;font-size:12px;color:#aaa;font-family:Arial,sans-serif">'
+        'Enviado desde <strong style="color:#888">' + footer_name + '</strong>.'
+        '</p>'
+        '</td>'
+        '</tr>'
+
+        '</table>'  # fin contenedor 600px
+        '</td></tr>'
+        '</table>'  # fin wrapper
+        '</body></html>'
+    )
 
 # ─────────────────────────────────────────────
 # RESEND SEND
