@@ -308,7 +308,9 @@ def send_resend(to: str, subject: str, body_plain: str, body_html: str, reply_to
         params["headers"] = {"In-Reply-To": reply_to_mid, "References": reply_to_mid}
 
     response = resend.Emails.send(params)
-    logger.info(f"Resend OK → {to} | id={response.get('id','?')}")
+    # SendResponse es un objeto con atributo .id, no un dict
+    email_id = response.id if hasattr(response, "id") else str(response)
+    logger.info(f"Resend OK → {to} | id={email_id}")
     return response
 
 # ─────────────────────────────────────────────
@@ -691,13 +693,14 @@ async def send_email(request: Request, _: str = Depends(require_auth)):
     conn = get_db()
     for to in recipients:
         try:
-            send_resend(to, subject, body, body_html, reply_to)
+            resp = send_resend(to, subject, body, body_html, reply_to)
+            email_id = resp.id if hasattr(resp, "id") else "?"
             _log_sent(conn, to, subject, body, body_html, intent, campaign_id)
-            results.append({"to": to, "ok": True})
-            logger.info(f"Email enviado via Resend a {to}")
+            results.append({"to": to, "ok": True, "resend_id": email_id})
+            logger.info(f"Email enviado via Resend a {to} | resend_id={email_id}")
         except resend.exceptions.ResendError as e:
-            logger.error(f"Resend API error → {to}: {e}")
-            results.append({"to": to, "ok": False, "error": f"Resend error: {e}"})
+            logger.error(f"Resend API error → {to}: code={e.code} msg={e.message}")
+            results.append({"to": to, "ok": False, "error": f"Resend error {e.code}: {e.message}"})
         except Exception as e:
             logger.error(f"Error inesperado → {to}: {type(e).__name__}: {e}")
             results.append({"to": to, "ok": False, "error": f"{type(e).__name__}: {e}"})
